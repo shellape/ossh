@@ -22,7 +22,7 @@ Walkthrough
 Enter connection id: 1
 ```
 
-* open a new ssh connection to a different server [01]+2 will open a connection to 192.168.10.15
+* open a new ssh connection to a different server [02]+2 will open a connection to 192.168.10.15
 ```
 # ossh
 [01] ssh 192.168.10.12
