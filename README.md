@@ -41,9 +41,13 @@ Hints
 * For choosing the first entry from the overview you can simply hit enter.
 * "[--]" in the overview implies that all following entries come from the history file.
 * There are global variables in the script header. Here are their default values:
+
   HIST_FILE=~/.ossh_history
+
   MAX_HIST_LINES=10
+
   EXCLUDE_RE=
+
   Read the script's comment about the variable $EXCLUDE_RE for further information.
 
 Known Problems
