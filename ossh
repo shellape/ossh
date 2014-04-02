@@ -34,7 +34,8 @@ fi
 if [[ ! -z "$conn_list" ]]; then
     # Sort command somehow strips off trailing newline thus adding it again.
     conn_list="$( printf "$conn_list" | sort -u )\n"
-    conn_list_len=$( printf "$conn_list" | wc -l )
+    # MacOS bash adds some leading spaces to conn_list, sed as workaround.
+    conn_list_len=$( printf "$conn_list" | wc -l | sed 's/^ *//' )
     # Print current ssh connections.
     printf "$conn_list" | awk '{ printf "[%02d] %s\n", NR, $0 }'
 # If file empty exit.
