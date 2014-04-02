@@ -9,17 +9,19 @@ MAX_HIST_LINES=10
 # which should not appear in the connection overview.
 EXCLUDE_RE=
 
-hist_file_basedir=${HIST_FILE%/*}
-[[ ! -e $hist_file_basedir ]] && mkdir -p $hist_file_basedir
-[[ ! -e $HIST_FILE ]] && touch $HIST_FILE
+if [[ ! -e $HIST_FILE ]]; then
+    hist_file_basedir=${HIST_FILE%/*}
+    [[ ! -e $hist_file_basedir ]] && mkdir -p $hist_file_basedir
+    touch $HIST_FILE
+fi
 
 ssh_client_pids=$( lsof -n -iTCP -sTCP:ESTABLISHED | awk '/^ssh/{print $2}' )
 
 if [[ -n $ssh_client_pids ]]; then
+    ps_list=$( ps -eo pid,args | grep '[s]sh' )
     for pid in $ssh_client_pids; do
-        ps_list=$( ps -eo pid,args | grep '[s]sh' )
         ssh_client_cmd="$( echo "$ps_list" \
-                            | awk -v pid=$pid '$1==pid{$1=""; sub(/^ /,""); print $0}' )"
+                            | awk -v pid=$pid '$1==pid{$1=""; sub(/^ /,""); print $0; exit}' )"
         if [[ $ssh_client_cmd =~ ${EXCLUDE_RE:-^$} ]]; then
             continue
         else
@@ -32,11 +34,11 @@ if [[ -n $ssh_client_pids ]]; then
 fi
 
 if [[ ! -z "$conn_list" ]]; then
-    # Sort command somehow strips off trailing newline thus adding it again.
-    conn_list="$( printf "$conn_list" | sort -u )\n"
-    conn_list_len=$( printf "$conn_list" | wc -l )
+    # After sorting somehow the trailing newline is stripped off, thus adding it again.
+    conn_list="$( echo -ne "$conn_list" | sort -u )\n"
+    conn_list_len=$( echo -ne "$conn_list" | wc -l )
     # Print current ssh connections.
-    printf "$conn_list" | awk '{ printf "[%02d] %s\n", NR, $0 }'
+    echo -ne "$conn_list" | awk '{ printf "[%02d] %s\n", NR, $0 }'
 # If file empty exit.
 elif [[ ! -s $HIST_FILE ]]; then
     exit
@@ -44,7 +46,7 @@ fi
 
 # Compare current and history connections.
 hist_only_entries="$( comm -13 \
-                        <( printf "$conn_list" | sort ) \
+                        <( echo -ne "$conn_list" | sort ) \
                         <( sort $HIST_FILE ) )"
 if [[ ! -z $hist_only_entries ]]; then
     echo "[--]"
@@ -52,7 +54,7 @@ if [[ ! -z $hist_only_entries ]]; then
     echo "$hist_only_entries" \
         | awk -v cnt=${conn_list_len##* } '{ cnt+=1; printf "[%02d] %s\n", cnt, $0 }'
 fi
-printf -- ">%s: " "id"
+echo -n '>id: '
 read input
 
 # Validate input.
@@ -71,8 +73,8 @@ else
     fi
 
     # Use id 1 if $conn_id is unset.
-    ssh_client_cmd="$( printf "${conn_list}$hist_only_entries" \
-                        | awk -v id=${conn_id:-1} 'NR==id' )"
+    ssh_client_cmd="$( echo -ne "${conn_list}$hist_only_entries" \
+                        | awk -v id=${conn_id:-1} 'NR==id{print; exit}' )"
     if [[ -n $add_val ]]; then
         # If there is no match script will exit (set -e).
         ip_addr=$( echo $ssh_client_cmd | grep -Eo '([0-9]+\.){3}[0-9]+' )
@@ -81,12 +83,11 @@ else
         new_ip_addr="${ip_addr%.*}.$new_last_oct"
         # Primitive sanity check.
         [[ $new_last_oct -ge 1 ]] && [[ $new_last_oct -le 255 ]]
-        $( echo $ssh_client_cmd \
-            | sed "s/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr/" )
+        ${ssh_client_cmd/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr}
     else
         $ssh_client_cmd
     fi
     # Write connections to history file.
-    printf "${conn_list}$hist_only_entries" \
+    echo -ne "${conn_list}$hist_only_entries" \
         | head -n $MAX_HIST_LINES > $HIST_FILE
 fi
