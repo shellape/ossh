@@ -9,6 +9,9 @@ MAX_HIST_LINES=10
 # which should not appear in the connection overview.
 EXCLUDE_RE=
 
+hist_file_basedir=${HIST_FILE%/*}
+[[ ! -e $hist_file_basedir ]] && mkdir -p $hist_file_basedir
+[[ ! -e $HIST_FILE ]] && touch $HIST_FILE
 
 ssh_client_pids=$( lsof -n -iTCP -sTCP:ESTABLISHED | awk '/^ssh/{print $2}' )
 
