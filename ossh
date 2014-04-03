@@ -9,6 +9,7 @@ MAX_HIST_LINES=10
 # which should not appear in the connection overview.
 EXCLUDE_RE=
 
+# Check history file.
 if [[ ! -e $HIST_FILE ]]; then
     hist_file_basedir=${HIST_FILE%/*}
     [[ ! -e $hist_file_basedir ]] && mkdir -p $hist_file_basedir
@@ -17,6 +18,7 @@ fi
 
 ssh_client_pids=$( lsof -n -iTCP -sTCP:ESTABLISHED | awk '/^ssh/{print $2}' )
 
+# Get current ssh login command lines.
 if [[ -n $ssh_client_pids ]]; then
     ps_list=$( ps -eo pid,args | grep '[s]sh' )
     for pid in $ssh_client_pids; do
@@ -33,6 +35,7 @@ if [[ -n $ssh_client_pids ]]; then
     [[ "$conn_list" =~ ^\\n$ ]] && unset conn_list
 fi
 
+# Check connection list and history file.
 if [[ ! -z "$conn_list" ]]; then
     # After sorting somehow the trailing newline is stripped off, thus adding it again.
     conn_list="$( echo -ne "$conn_list" | sort -u )\n"
@@ -48,6 +51,7 @@ fi
 hist_only_entries="$( comm -13 \
                         <( echo -ne "$conn_list" | sort ) \
                         <( sort $HIST_FILE ) )"
+# Print connection list.
 if [[ ! -z $hist_only_entries ]]; then
     echo "[--]"
     # MacOS bash adds some leading spaces to conn_list, parameter expansion as workaround.
@@ -83,11 +87,13 @@ else
         new_ip_addr="${ip_addr%.*}.$new_last_oct"
         # Primitive sanity check.
         [[ $new_last_oct -ge 1 ]] && [[ $new_last_oct -le 255 ]]
-        ${ssh_client_cmd/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr}
+        ssh_login="${ssh_client_cmd/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr}"
     else
-        $ssh_client_cmd
+        ssh_login="$ssh_client_cmd"
     fi
     # Write connections to history file.
     echo -ne "${conn_list}$hist_only_entries" \
         | head -n $MAX_HIST_LINES > $HIST_FILE
+    # Do the login.
+    $ssh_login
 fi
