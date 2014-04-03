@@ -44,7 +44,8 @@ if [[ ! -z "$conn_list" ]]; then
     echo -ne "$conn_list" | awk '{ printf "[%02d] %s\n", NR, $0 }'
 # If file empty exit.
 elif [[ ! -s $HIST_FILE ]]; then
-    exit
+    echo "No current ssh connections and empty $HIST_FILE." >&2
+    exit 1
 fi
 
 # Compare current and history connections.
@@ -63,8 +64,8 @@ read input
 
 # Validate input.
 if [[ ! $input =~ ^([0-9]{1,3}){0,1}([+-][0-9]{1,3}){0,1}$ ]]; then
-    echo "Only int or int+int (max. 3 digits each) allowed."
-    exit
+    echo "Only int or int+int (max. 3 digits each) allowed." >&2
+    exit 1
 else
     # Remove all leading zeros, example input: "04+01".
     input=$( echo $input | sed 's/^0*//; s/+0*/+/; s/-0*/-/' )
@@ -80,13 +81,18 @@ else
     ssh_client_cmd="$( echo -ne "${conn_list}$hist_only_entries" \
                         | awk -v id=${conn_id:-1} 'NR==id{print; exit}' )"
     if [[ -n $add_val ]]; then
-        # If there is no match script will exit (set -e).
-        ip_addr=$( echo $ssh_client_cmd | grep -Eo '([0-9]+\.){3}[0-9]+' )
+        if ! ip_addr=$( echo $ssh_client_cmd | grep -Eo '([0-9]+\.){3}[0-9]+' ); then
+            echo "Could not match IPv4 in \"$ssh_client_cmd\"." >&2
+            exit 1
+        fi
         last_oct=${ip_addr##*.}
         new_last_oct=$(( $last_oct + $add_val ))
         new_ip_addr="${ip_addr%.*}.$new_last_oct"
         # Primitive sanity check.
-        [[ $new_last_oct -ge 1 ]] && [[ $new_last_oct -le 255 ]]
+        if [[ ! $new_last_oct -ge 1 ]] || [[ ! $new_last_oct -le 255 ]]; then
+            echo "$new_last_oct not within meaningful IPv4 range." >&2
+            exit 1
+        fi
         ssh_login="${ssh_client_cmd/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr}"
     else
         ssh_login="$ssh_client_cmd"
