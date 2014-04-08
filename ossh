@@ -44,7 +44,7 @@ if [[ ! -z "$conn_list" ]]; then
     echo -ne "$conn_list" | awk '{ printf "[%02d] %s\n", NR, $0 }'
 # If file empty exit.
 elif [[ ! -s $HIST_FILE ]]; then
-    echo "No current ssh connections and empty $HIST_FILE." >&2
+    echo "No current ssh connections and $HIST_FILE is empty." >&2
     exit 1
 fi
 
@@ -64,7 +64,7 @@ read input
 
 # Validate input.
 if [[ ! $input =~ ^([0-9]{1,3}){0,1}([+-][0-9]{1,3}){0,1}$ ]]; then
-    echo "Only int or int+int (max. 3 digits each) allowed." >&2
+    echo 'Only "int" or "int+int" allowed (max. 3 digits each).' >&2
     exit 1
 else
     # Remove all leading zeros, example input: "04+01".
@@ -82,7 +82,7 @@ else
                         | awk -v id=${conn_id:-1} 'NR==id{print; exit}' )"
     if [[ -n $add_val ]]; then
         if ! ip_addr=$( echo $ssh_client_cmd | grep -Eo '([0-9]+\.){3}[0-9]+' ); then
-            echo "Could not match IPv4 in \"$ssh_client_cmd\"." >&2
+            echo "Could not match an IPv4 address in \"$ssh_client_cmd\"." >&2
             exit 1
         fi
         last_oct=${ip_addr##*.}
@@ -93,6 +93,7 @@ else
             echo "$new_last_oct not within meaningful IPv4 range." >&2
             exit 1
         fi
+        # To stay MacOS compatible avoiding the use of sed's "-r".
         ssh_login="$( echo "$ssh_client_cmd" | sed "s/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr/" )"
     else
         ssh_login="$ssh_client_cmd"
