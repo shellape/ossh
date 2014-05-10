@@ -4,21 +4,24 @@
 set -e
 
 HIST_FILE=~/.ossh_history
-MAX_HIST_LINES=10
+MAX_HIST_LINES=6
 # Define optional exclude regex for ssh connections
 # which should not appear in the connection overview.
-EXCLUDE_RE=
+EXCLUDE_RE=""
+INDEX=$1
+
 
 # Check history file.
 if [[ ! -e $HIST_FILE ]]; then
-    hist_file_basedir=${HIST_FILE%/*}
-    [[ ! -e $hist_file_basedir ]] && mkdir -p $hist_file_basedir
+    hist_basedir=${HIST_FILE%/*}
+    [[ ! -e $hist_basedir ]] && mkdir -p $hist_basedir
     touch $HIST_FILE
 fi
 
+# Get current ssh connections.
 ssh_client_pids=$( lsof -n -iTCP -sTCP:ESTABLISHED | awk '/^ssh/{print $2}' )
 
-# Get current ssh login command lines.
+# Get current ssh command lines.
 if [[ -n $ssh_client_pids ]]; then
     ps_list=$( ps -eo pid,args | grep '[s]sh' )
     for pid in $ssh_client_pids; do
@@ -27,62 +30,109 @@ if [[ -n $ssh_client_pids ]]; then
         if [[ $ssh_client_cmd =~ ${EXCLUDE_RE:-^$} ]]; then
             continue
         else
-            # Using variable because bash does not provide
-            # a nice way to sort arrays (needed later).
-            conn_list="${conn_list}${ssh_client_cmd}\n"
+            conn_arr[ ${i:=0} ]="$ssh_client_cmd"
+            i=$(( $i + 1 ))
         fi
     done
-    [[ "$conn_list" =~ ^\\n$ ]] && unset conn_list
 fi
 
-# Check connection list and history file.
-if [[ ! -z "$conn_list" ]]; then
-    # After sorting somehow the trailing newline is stripped off, thus adding it again.
-    conn_list="$( echo -ne "$conn_list" | sort -u )\n"
-    conn_list_len=$( echo -ne "$conn_list" | wc -l )
-    # Print current ssh connections.
-    echo -ne "$conn_list" | awk '{ printf "[%02d] %s\n", NR, $0 }'
-# If file empty exit.
-elif [[ ! -s $HIST_FILE ]]; then
+# Eliminate duplicate items in connection array.
+# Here the array expansion via wildcard and modified IFS are necessary.
+[[ -n $conn_arr ]] && IFS=$'\n' conn_arr=( $( echo "${conn_arr[*]}" | sort -u ) )
+unset IFS
+
+# Exit if no current or history connections available.
+if [[ -z $conn_arr ]] && [[ ! -s $HIST_FILE ]]; then
     echo "No current ssh connections and $HIST_FILE is empty." >&2
     exit 1
 fi
 
-# Compare current and history connections.
-hist_only_entries="$( comm -13 \
-                        <( echo -ne "$conn_list" | sort ) \
-                        <( sort $HIST_FILE ) )"
-# Print connection list.
-if [[ ! -z $hist_only_entries ]]; then
-    echo "[--]"
-    # MacOS bash adds some leading spaces to conn_list, parameter expansion as workaround.
-    echo "$hist_only_entries" \
-        | awk -v cnt=${conn_list_len##* } '{ cnt+=1; printf "[%02d] %s\n", cnt, $0 }'
+if [[ -s $HIST_FILE ]]; then
+    # Fill the history array.
+    while read line; do
+        hist_arr[ ${j:=0} ]="$line"
+        j=$(( $j + 1 ))
+    done < $HIST_FILE
 fi
-echo -n '>id: '
-read input
+
+# Continue here only if connection array is set.
+if [[ -n $conn_arr ]]; then
+    # Print current connections. 
+    for x in "${!conn_arr[@]}"; do
+        [[ -z $INDEX ]] && printf "[%02d] %s\n" $(( $x + 1 )) "${conn_arr[ $x ]}"
+        if [[ -s $HIST_FILE ]]; then 
+            # Check if the current connection is already in the
+            # temporary history array and if so reset this item.
+            for y in "${!hist_arr[@]}"; do
+                if [[ ${hist_arr[ $y ]} =~ ^${conn_arr[ $x ]}$ ]]; then
+                    hist_arr[ $y ]=""
+                fi
+            done
+        fi
+    done
+
+    # Cleanup history array.
+    hist_arr_tmp=( "${hist_arr[@]}" )
+    unset hist_arr
+    # Fill the final hist_arr without empty items.
+    for z in "${!hist_arr_tmp[@]}"; do
+        [[ -n ${hist_arr_tmp[ $z ]} ]] && hist_arr=( "${hist_arr[@]}" "${hist_arr_tmp[ $z ]}" )
+    done
+fi
+
+# Print history connections. 
+if [[ -n $hist_arr ]] && [[ -z $INDEX ]]; then
+    echo '[--]'
+    for i in "${!hist_arr[@]}"; do
+        printf "[%02d] %s\n" $(( ${#conn_arr[@]} + $i + 1 )) "${hist_arr[ $i ]}"
+    done
+fi
+
+# Check if there was an index passed directly or we have to read it.
+if [[ -n $INDEX ]]; then
+    input="$INDEX"
+else
+    echo -n '>id: '
+    read input
+fi
 
 # Validate input.
 if [[ ! $input =~ ^([0-9]{1,3}){0,1}([+-][0-9]{1,3}){0,1}$ ]]; then
-    echo 'Only "int" or "int+int" allowed (max. 3 digits each).' >&2
+    echo "Only int or int+int (max. 3 digits each) allowed." >&2
     exit 1
 else
     # Remove all leading zeros, example input: "04+01".
     input=$( echo $input | sed 's/^0*//; s/+0*/+/; s/-0*/-/' )
-    # Split off conn_id.
+    # Split off conn_id and subtract 1 since array index starts with 0.
     conn_id=${input%[+-]*}
+    if [[ -n $conn_id ]] && [[ $conn_id -ne 0 ]]; then
+        conn_id=$(( $conn_id - 1 ))
+    fi
     # Check if arithm. operator given.
     if [[ $input =~ [+-] ]]; then
         add_val=${input#*[+-]}
         [[ $input =~ - ]] && add_val="-$add_val"
     fi
 
-    # Use id 1 if $conn_id is unset.
-    ssh_client_cmd="$( echo -ne "${conn_list}$hist_only_entries" \
-                        | awk -v id=${conn_id:-1} 'NR==id{print; exit}' )"
+    # Select the ssh command to execute.
+    # Distinguish to which array the id belongs.
+    # Use id 0 if connection id is unset.
+    if [[ -n $conn_arr ]] && [[ $conn_id -lt $(( ${#conn_arr[@]} )) ]]; then
+        ssh_client_cmd="${conn_arr[ ${conn_id:-0} ]}"
+    # Check if id is in range.
+    elif [[ $(( $conn_id + 1 )) -gt $(( ${#conn_arr[@]} + ${#hist_arr[@]} )) ]]; then
+        echo "The id is out of range." >&2
+        exit 1
+    else
+        # If there is no current connection or the id is out of
+        # range of the connection array use the history array.
+        conn_id=$(( $conn_id - ${#conn_arr[@]} ))
+        ssh_client_cmd="${hist_arr[ ${conn_id:-0} ]}"
+    fi
+
     if [[ -n $add_val ]]; then
         if ! ip_addr=$( echo $ssh_client_cmd | grep -Eo '([0-9]+\.){3}[0-9]+' ); then
-            echo "Could not match an IPv4 address in \"$ssh_client_cmd\"." >&2
+            echo "Could not match an IPv4 in \"$ssh_client_cmd\"." >&2
             exit 1
         fi
         last_oct=${ip_addr##*.}
@@ -93,14 +143,19 @@ else
             echo "$new_last_oct not within meaningful IPv4 range." >&2
             exit 1
         fi
-        # To stay MacOS compatible avoiding the use of sed's "-r".
-        ssh_login="$( echo "$ssh_client_cmd" | sed "s/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr/" )"
+        # To stay MacOS compatible avoid the use of sed's "-r" parameter.
+        ssh_login="$( echo "$ssh_client_cmd" \
+                        | sed "s/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr/" )"
     else
         ssh_login="$ssh_client_cmd"
     fi
-    # Write connections to history file.
-    echo -ne "${conn_list}$hist_only_entries" \
-        | head -n $MAX_HIST_LINES > $HIST_FILE
+
+    # Write history file.
+    {   for line in "${conn_arr[@]}" "${hist_arr[@]}"; do
+            echo "$line"
+        done 
+    }   | head -n "${MAX_HIST_LINES:-0}" > $HIST_FILE
+
     # Do the login.
     $ssh_login
 fi
