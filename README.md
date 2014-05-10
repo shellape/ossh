@@ -40,11 +40,12 @@ Hints
 
 * For choosing the first entry from the overview you can simply hit enter.
 * "[--]" in the overview implies that all following entries come from the history file.
+* If you know what the overview looks like you can pass the id direclty, e.g. "ossh 1" or "ossh 4"
 * There are global variables in the script header. Here are their default values:
 
   HIST_FILE=~/.ossh_history
 
-  MAX_HIST_LINES=10
+  MAX_HIST_LINES=6
 
   EXCLUDE_RE=
 
