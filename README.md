@@ -44,13 +44,11 @@ Hints
 * Passing the parameter [-a|--auto] provides the possibility to auto login if
   there is only one unique current connection instead of printing the overview.
 * There are global variables in the script header. Here are their default values:
-
+```
   HIST_FILE=~/.ossh_history
-
   MAX_HIST_LINES=6
-
   EXCLUDE_RE=
-
+```
   Read the script's comment about the variable $EXCLUDE_RE for further information.
 
 Known Problems
