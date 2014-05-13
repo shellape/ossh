@@ -41,6 +41,8 @@ Hints
 * For choosing the first entry from the overview you can simply hit enter.
 * "[--]" in the overview implies that all following entries come from the history file.
 * If you know what the overview looks like you can pass the id direclty, e.g. "ossh 1" or "ossh 4"
+* Passing the parameter [-a|--auto] provides the possibility to auto login if
+  there is only one unique current connection instead of printing the overview.
 * There are global variables in the script header. Here are their default values:
 
   HIST_FILE=~/.ossh_history
