@@ -7,7 +7,7 @@ HIST_FILE=~/.ossh_history
 MAX_HIST_LINES=6
 # Define optional exclude regex for ssh connections
 # which should not appear in the connection overview.
-EXCLUDE_RE=""
+EXCLUDE_RE=''
 INDEX=$1
 
 
@@ -36,11 +36,6 @@ if [[ -n $ssh_client_pids ]]; then
     done
 fi
 
-# Eliminate duplicate items in connection array.
-# Here the array expansion via wildcard and modified IFS are necessary.
-[[ -n $conn_arr ]] && IFS=$'\n' conn_arr=( $( echo "${conn_arr[*]}" | sort -u ) )
-unset IFS
-
 # Exit if no current or history connections available.
 if [[ -z $conn_arr ]] && [[ ! -s $HIST_FILE ]]; then
     echo "No current ssh connections and $HIST_FILE is empty." >&2
@@ -55,14 +50,29 @@ if [[ -s $HIST_FILE ]]; then
     done < $HIST_FILE
 fi
 
+# Eliminate duplicate items in connection array.
+# Here the array expansion via wildcard and modified IFS are necessary.
+IFS=$'\n' conn_arr=( $( echo "${conn_arr[*]}" | sort -u ) )
+unset IFS
+# Some people want auto login if there is only one unique current
+# connection instead of printing the overview (dedicated to Alex).
+if [[ $INDEX =~ ^-a|--auto$ ]]; then
+    if [[ ${#conn_arr[@]} -eq 1 ]]; then
+        INDEX=0
+    else
+        # Either $2 is set or the variable gets an empty value.
+        INDEX="$2"
+    fi
+fi
+
 # Continue here only if connection array is set.
 if [[ -n $conn_arr ]]; then
     # Print current connections. 
     for x in "${!conn_arr[@]}"; do
         [[ -z $INDEX ]] && printf "[%02d] %s\n" $(( $x + 1 )) "${conn_arr[ $x ]}"
         if [[ -s $HIST_FILE ]]; then 
-            # Check if the current connection is already in the
-            # temporary history array and if so reset this item.
+            # Check if the current connection is already in
+            # the history array and if so reset this item.
             for y in "${!hist_arr[@]}"; do
                 if [[ ${hist_arr[ $y ]} =~ ^${conn_arr[ $x ]}$ ]]; then
                     hist_arr[ $y ]=""
@@ -72,12 +82,11 @@ if [[ -n $conn_arr ]]; then
     done
 
     # Cleanup history array.
-    hist_arr_tmp=( "${hist_arr[@]}" )
-    unset hist_arr
-    # Fill the final hist_arr without empty items.
-    for z in "${!hist_arr_tmp[@]}"; do
-        [[ -n ${hist_arr_tmp[ $z ]} ]] && hist_arr=( "${hist_arr[@]}" "${hist_arr_tmp[ $z ]}" )
+    for i in "${!hist_arr[@]}"; do
+        # Fill the array without empty items.
+        [[ -n ${hist_arr[ $i ]} ]] && hist_arr_clean=( "${hist_arr_clean[@]}" "${hist_arr[ $i ]}" )
     done
+    hist_arr=( "${hist_arr_clean[@]}" )
 fi
 
 # Print history connections. 
