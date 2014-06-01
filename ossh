@@ -38,7 +38,7 @@ Options:
  index      specify a numeric index to use from the overview, 
             e.g. "2" or "+3" or "4+1" or "-2" or "3-1"
  -l|--list  only list connections, do not a ask for a connection id
-            (mutually exclusive with "index".
+            (mutually exclusive with "index")
  -a|--auto  auto login if there is only one unique current connection
  -h|--help  show this help
 
