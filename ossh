@@ -1,8 +1,13 @@
 #!/bin/bash 
-# name:        ossh
-# description: List current ssh client connections and
-#              establish a further one if requested.
-# author:      vd@ghostshell.de
+# name:          ossh
+# description:   List current ssh client connections and
+#                establish a further one if requested.
+# author:        vd@ghostshell.de
+# version:       0.1
+# tested on:     Debian Wheezy
+# last modified: 2015-07
+# vim: ts=3 sw=3 sts=3 et ai ci
+
 set -e
 
 #-----------------------
@@ -10,10 +15,20 @@ set -e
 #-----------------------
 
 HIST_FILE=~/.ossh_history
-MAX_HIST_LINES=6
-# Define optional exclude regex for ssh connections
-# which should not appear in the connection overview.
-EXCLUDE_RE='sshfs|scp'
+MAX_HIST_LINES=16
+# Optional bash compatible regex for ssh connections which
+# should not appear in the connection overview at all.
+CONN_EXCL_RE='sshfs|sftp|scp'
+# Optional sed compatible regex to strip off a part of
+# of the ssh command in the connection overview.
+SSH_STRIP_RE=''
+# I you're using a wrapper to call ssh or an alias
+# you can specify it here.
+SSH_BIN=
+
+# Above variables can also be sourced via include config.
+INCLUDE_CONF=~/.ossh_include.conf
+[[ -f $INCLUDE_CONF ]] && . $INCLUDE_CONF
 
 #------------------------
 # Other global variables
@@ -38,7 +53,7 @@ Options:
  index      specify a numeric index to use from the overview, 
             e.g. "2" or "+3" or "4+1" or "-2" or "3-1"
  -l|--list  only list connections, do not a ask for a connection id
-            (mutually exclusive with "index")
+            (mutually exclusive with "index"), supersedes "-a"
  -a|--auto  auto login if there is only one unique current connection
  -h|--help  show this help
 
@@ -46,219 +61,227 @@ EOF
 }
 
 parse_argv() {
-    for arg in $ARGV; do
-        if [[ $arg =~ ^(-h|--help)$ ]]; then
-            usage
-            exit
-        elif [[ $arg =~ ^(-a|--auto)$ ]]; then 
-            AUTO_FLAG=true
-        elif [[ $arg =~ ^(-l|--list)$ ]]; then 
-            LIST_FLAG=true
-        elif [[ $arg =~ ^(-la|-al)$ ]]; then
-            AUTO_FLAG=true
-            LIST_FLAG=true
-        elif [[ $arg =~ $VALIDATION_PATTERN ]]; then
-            INDEX=$arg
-        else
-            echo "$arg: invalid parameter." >&2
-            echo "Try '$PROG_NAME -h' for more information." >&2
-            exit 1
-        fi  
-    done
+   for arg in $ARGV; do
+      if [[ $arg =~ ^(-h|--help)$ ]]; then
+         usage
+         exit
+      elif [[ $arg =~ ^(-a|--auto)$ ]]; then
+         AUTO_FLAG=true
+      elif [[ $arg =~ ^(-l|--list)$ ]]; then
+         LIST_FLAG=true
+      elif [[ $arg =~ ^(-la|-al)$ ]]; then
+         AUTO_FLAG=true
+         LIST_FLAG=true
+      elif [[ $arg =~ $VALIDATION_PATTERN ]]; then
+         INDEX=$arg
+      else
+         echo "$arg: invalid parameter." >&2
+         echo "Try '$PROG_NAME -h' for more information." >&2
+         exit 1
+      fi
+   done
 
-    if $AUTO_FLAG && $LIST_FLAG; then
-        AUTO_FLAG=false
-    fi
+   if $AUTO_FLAG && $LIST_FLAG; then
+      AUTO_FLAG=false
+   fi
 
-    if $LIST_FLAG && [[ -n $INDEX ]]; then
-        echo "Specified parameters are mutually exclusive." >&2
-        echo "Try '$PROG_NAME -h' for more information." >&2
-        exit 1
-    fi
+   if $LIST_FLAG && [[ -n $INDEX ]]; then
+      echo "Specified parameters are mutually exclusive." >&2
+      echo "Try \"$PROG_NAME -h\" for more information." >&2
+      exit 1
+   fi
 }
 
 create_hist_file() {
-    local hist_basedir
-    if [[ ! -e $HIST_FILE ]]; then
-        hist_basedir=${HIST_FILE%/*}
-        [[ ! -e $hist_basedir ]] && mkdir -p $hist_basedir
-        touch $HIST_FILE
-    fi
+   local hist_basedir
+   if [[ ! -e $HIST_FILE ]]; then
+      hist_basedir=${HIST_FILE%/*}
+      [[ ! -e $hist_basedir ]] && mkdir -p $hist_basedir
+      touch $HIST_FILE
+   fi
 }
 
 get_ssh_pid() {
-    SSH_CLIENT_PID=$( lsof -n -iTCP -sTCP:ESTABLISHED | awk '$1=="ssh"{ print $2 }' )
+   SSH_CLIENT_PID=$( lsof -n -iTCP -sTCP:ESTABLISHED | awk '$1=="ssh"{ print $2 }' )
 }
 
 get_curr_conn() {
-    local ps_list ssh_client_cmd
-    if [[ -n $SSH_CLIENT_PID ]]; then
-        ps_list=$( ps -eo pid,args | grep '[s]sh' )
-        for pid in $SSH_CLIENT_PID; do
-            ssh_client_cmd="$( echo "$ps_list" \
-                                | awk -v pid=$pid '$1==pid{$1=""; sub(/^ /,""); print $0; exit}' )"
-            if [[ $ssh_client_cmd =~ ${EXCLUDE_RE:-^$} ]]; then
-                continue
-            else
-                CONN_ARR[ ${i:=0} ]="$ssh_client_cmd"
-                i=$(( $i + 1 ))
-            fi
-        done
-    fi
+   local ps_list ssh_client_cmd
+   if [[ -n $SSH_CLIENT_PID ]]; then
+      ps_list=$( ps -eo pid,args | grep '[s]sh' )
+      for pid in $SSH_CLIENT_PID; do
+         ssh_client_cmd="$( echo "$ps_list" \
+                        | awk -v pid=$pid '$1==pid{$1=""; sub(/^ /,""); print $0; exit}' )"
+         if [[ $ssh_client_cmd =~ ${CONN_EXCL_RE:-^$} ]]; then
+            continue
+         else
+            CONN_ARR[ ${i:=0} ]="$ssh_client_cmd"
+            i=$(( $i + 1 ))
+         fi
+      done
+   fi
+   # Unique items in connection array.
+   # The array expansion via wildcard is necessary here.
+   # sort has to be called twice. First to unique, then to
+   # sort by IP. If called at once some entries will get lost.
+   IFS=$'\n' CONN_ARR=( $( echo "${CONN_ARR[*]}" | sort -u | sort -nt'.' -k 1,1 -k 2,2 -k 3,3 -k 4,4 ) )
+   unset IFS
 }
 
-check_conn() {
-    # Exit if no current or history connections available.
-    if [[ -z $CONN_ARR ]] && [[ ! -s $HIST_FILE ]]; then
-        echo "No current ssh connections and $HIST_FILE is empty." >&2
-        exit 1
-    fi
+check_conn_exists() {
+   # Exit if no current or history connections available.
+   if [[ -z $CONN_ARR ]] && [[ ! -s $HIST_FILE ]]; then
+      echo "No current ssh connections and $HIST_FILE is empty." >&2
+      exit 1
+   fi
 }
 
-get_hist_conn() {
-    if [[ -s $HIST_FILE ]]; then
-        # Fill the history array.
-        while read line; do
-            HIST_ARR[ ${j:=0} ]="$line"
-            j=$(( $j + 1 ))
-        done < $HIST_FILE
-    fi
-}
-
-eliminate_dups() {
-    # Eliminate duplicate items in connection array.
-    # Here the array expansion via wildcard is necessary.
-    IFS=$'\n' CONN_ARR=( $( echo "${CONN_ARR[*]}" | sort -u ) )
-    unset IFS
+read_hist_file() {
+   local conn_line hist_line duplicate
+   if [[ -s $HIST_FILE ]]; then
+      # Fill the history array.
+      while read hist_line; do
+         duplicate=false
+         # Check if entry is already in conn array. If so skip.
+         for x in ${!CONN_ARR[@]}; do
+            conn_line="$( strip_off "${CONN_ARR[ $x ]}" )"
+            [[ $conn_line = $hist_line ]] && duplicate=true
+         done
+         $duplicate || HIST_ARR[ ${j:=0} ]="$hist_line"
+         j=$(( $j + 1 ))
+      done < $HIST_FILE
+   fi
 }
 
 check_auto_flag() {
-    if [[ ${#CONN_ARR[@]} -eq 1 ]] && $AUTO_FLAG; then
-        INDEX=1
-    fi 
+   if [[ ${#CONN_ARR[@]} -eq 1 ]] && $AUTO_FLAG; then
+      INDEX=1
+   fi
+}
+
+strip_off() {
+   local line="$@"
+   if [[ -n $SSH_STRIP_RE ]]; then
+     echo "$line" | sed "s/$SSH_STRIP_RE//"
+   else
+     echo "$line"
+   fi
 }
 
 print_curr_conn() {
-    check_auto_flag
-    for x in ${!CONN_ARR[@]}; do
-        [[ -z $INDEX ]] && printf "[%02d] %s\n" $(( $x + 1 )) "${CONN_ARR[ $x ]}"
-        if [[ -s $HIST_FILE ]]; then 
-            # Check if the current connection is already in
-            # the history array and if so reset this item.
-            for y in "${!HIST_ARR[@]}"; do
-                if [[ ${HIST_ARR[ $y ]} =~ ^${CONN_ARR[ $x ]}$ ]]; then
-                    HIST_ARR[ $y ]=""
-                fi
-            done
-        fi
-    done
-}
-
-cleanup_hist() {
-    [[ -z $CONN_ARR ]] && return
-    local hist_arr_clean
-    for i in "${!HIST_ARR[@]}"; do
-        # Fill the array without empty items.
-        if [[ -n ${HIST_ARR[ $i ]} ]]; then
-            hist_arr_clean[ ${x:=0} ]="${HIST_ARR[ $i ]}"
-            x=$(( $x + 1 ))
-        fi
-    done
-    HIST_ARR=( "${hist_arr_clean[@]}" )
+   check_auto_flag
+   for x in ${!CONN_ARR[@]}; do
+      if [[ -z $INDEX ]]; then
+         strip_off $( printf "[%02d] %s\n" $(( $x + 1 )) "${CONN_ARR[ $x ]}" )
+      fi
+   done
 }
 
 print_hist_conn() {
-    check_auto_flag
-    if [[ -z $HIST_ARR ]] || [[ -n $INDEX ]]; then
-        return
-    fi
-    echo '[--]'
-    for i in "${!HIST_ARR[@]}"; do
-        printf "[%02d] %s\n" $(( ${#CONN_ARR[@]} + $i + 1 )) "${HIST_ARR[ $i ]}"
-    done
+   check_auto_flag
+   if [[ -z $HIST_ARR ]] || [[ -n $INDEX ]]; then
+      return
+   fi
+   echo '[--]'
+   for i in "${!HIST_ARR[@]}"; do
+      printf "[%02d] %s\n" $(( ${#CONN_ARR[@]} + $i + 1 )) "${HIST_ARR[ $i ]}"
+   done
 }
 
 read_input() {
-    $LIST_FLAG && exit
-    # Check if there was an index passed directly or we have to read it.
-    if [[ -n $INDEX ]]; then
-        INPUT="$INDEX"
-    else
-        echo -n '>id: '
-        read INPUT
-    fi
+   $LIST_FLAG && exit
+   # Check if there was an index passed directly or we have to read it.
+   if [[ -n $INDEX ]]; then
+      INPUT="$INDEX"
+   else
+      echo -n '>id: '
+      read INPUT
+   fi
 }
 
 validate_input() {
-    if [[ ! $INPUT =~ $VALIDATION_PATTERN ]]; then
-        echo "Invalid input." >&2
-        usage
-        exit 1
-    fi
+   if [[ ! $INPUT =~ $VALIDATION_PATTERN ]]; then
+      echo "Invalid input." >&2
+      usage
+      exit 1
+   fi
 }
 
 build_ssh_cmd() {
-    local conn_id add_val ssh_client_cmd ip_addr last_oct new_last_oct new_ip_addr
-    # Remove all leading zeros, example INPUT: "04+01".
-    INPUT=$( echo $INPUT | sed 's/^0*//; s/+0*/+/; s/-0*/-/' )
-    # Split off connection id and subtract 1 since array index starts with 0.
-    conn_id=${INPUT%[+-]*}
-    if [[ -n $conn_id ]] && [[ $conn_id -ne 0 ]]; then
-        conn_id=$(( $conn_id - 1 ))
-    fi
-    # Check if arithm. operator given.
-    if [[ $INPUT =~ [+-] ]]; then
-        add_val=${INPUT#*[+-]}
-        [[ $INPUT =~ - ]] && add_val="-$add_val"
-    fi
+   local conn_id add_val ssh_client_cmd ip_addr last_oct new_last_oct new_ip_addr
+   # Remove all leading zeros, example INPUT: "04+01".
+   INPUT=$( echo $INPUT | sed 's/^0*//; s/+0*/+/; s/-0*/-/' )
+   # Split off connection id and subtract 1 since array index starts with 0.
+   conn_id=${INPUT%[+-]*}
+   if [[ -n $conn_id ]] && [[ $conn_id -ne 0 ]]; then
+      conn_id=$(( $conn_id - 1 ))
+   fi
+   # Check if arithm. operator given.
+   if [[ $INPUT =~ [+-] ]]; then
+      add_val=${INPUT#*[+-]}
+      [[ $INPUT =~ - ]] && add_val="-$add_val"
+   fi
 
-    # Select the ssh command to be executed.
-    # Distinguish to which array the id belongs.
-    # Use id 0 if connection id is unset.
-    if [[ -n $CONN_ARR ]] && [[ $conn_id -lt ${#CONN_ARR[@]} ]]; then
-        ssh_client_cmd="${CONN_ARR[ ${conn_id:-0} ]}"
-    # Check if id is in range.
-    elif [[ $(( $conn_id + 1 )) -gt $(( ${#CONN_ARR[@]} + ${#HIST_ARR[@]} )) ]]; then
-        echo "The id is out of range." >&2
-        exit 1
-    else
-        # If there is no current connection or the id is out of
-        # range of the connection array use the history array.
-        conn_id=$(( $conn_id - ${#CONN_ARR[@]} ))
-        ssh_client_cmd="${HIST_ARR[ ${conn_id:-0} ]}"
-    fi
+   # Select the ssh command to be executed.
+   # Distinguish to which array the id belongs.
+   # Use id 0 if connection id is unset.
+   if [[ -n $CONN_ARR ]] && [[ $conn_id -lt ${#CONN_ARR[@]} ]]; then
+      ssh_client_cmd="${CONN_ARR[ ${conn_id:-0} ]}"
+   # Check if id is in range.
+   elif [[ $(( $conn_id + 1 )) -gt $(( ${#CONN_ARR[@]} + ${#HIST_ARR[@]} )) ]]; then
+      echo "The id is out of range." >&2
+      exit 1
+   else
+      # If there is no current connection or the id is out of
+      # range of the connection array use the history array.
+      conn_id=$(( $conn_id - ${#CONN_ARR[@]} ))
+      ssh_client_cmd="${HIST_ARR[ ${conn_id:-0} ]}"
+   fi
 
-    if [[ -n $add_val ]]; then
-        if ! ip_addr=$( echo $ssh_client_cmd | grep -Eo '([0-9]+\.){3}[0-9]+' ); then
-            echo "Could not match an IPv4 in \"$ssh_client_cmd\"." >&2
-            exit 1
-        fi
-        last_oct=${ip_addr##*.}
-        new_last_oct=$(( $last_oct + $add_val ))
-        new_ip_addr="${ip_addr%.*}.$new_last_oct"
-        # Primitive sanity check.
-        if [[ ! $new_last_oct -ge 1 ]] || [[ ! $new_last_oct -le 255 ]]; then
-            echo "$new_last_oct not within meaningful IPv4 range." >&2
-            exit 1
-        fi
-        # To stay MacOS compatible avoid the use of sed's "-r" parameter.
-        SSH_LOGIN="$( echo "$ssh_client_cmd" \
-                        | sed "s/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr/" )"
-    else
-        SSH_LOGIN="$ssh_client_cmd"
-    fi
+   if [[ -n $add_val ]]; then
+      if ! ip_addr=$( echo $ssh_client_cmd | grep -Eo '([0-9]+\.){3}[0-9]+' ); then
+         echo "Could not match an IPv4 in \"$ssh_client_cmd\"." >&2
+         exit 1
+      fi
+      last_oct=${ip_addr##*.}
+      new_last_oct=$(( $last_oct + $add_val ))
+      new_ip_addr="${ip_addr%.*}.$new_last_oct"
+      # Primitive sanity check.
+      if [[ ! $new_last_oct -ge 1 ]] || [[ ! $new_last_oct -le 255 ]]; then
+         echo "$new_last_oct not within meaningful IPv4 range." >&2
+         exit 1
+      fi
+      # To stay MacOS compatible avoid the use of sed's "-r" parameter.
+      SSH_LOGIN="$( echo "$ssh_client_cmd" \
+                  | sed "s/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr/" )"
+   else
+      SSH_LOGIN="$ssh_client_cmd"
+   fi
 }
 
 write_hist() {
-    {   echo $SSH_LOGIN;
-        for line in "${CONN_ARR[@]}" "${HIST_ARR[@]}"; do
-            [[ ! $line =~ ^$SSH_LOGIN$ ]] && echo "$line"
-        done 
-    } | head -n "${MAX_HIST_LINES:-0}" > $HIST_FILE
+   local stripped_ssh_login="$( strip_off "$SSH_LOGIN" )"
+
+   if [[ -n $HIST_FILE ]] && [[ $MAX_HIST_LINES -gt 0 ]]; then
+      {  for line in "${CONN_ARR[@]}"; do
+            strip_off "$line"
+         done
+         for line in "${HIST_ARR[@]}"; do
+            echo "$line"
+         done }  \
+            | sed '/^[ \t]*$/d' \
+            | sort -u \
+            | head -n "$MAX_HIST_LINES" > $HIST_FILE
+   fi
 }
 
 do_ssh_login() {
-    $SSH_LOGIN
+   if [[ -z $SSH_BIN ]]; then
+      $SSH_LOGIN
+   else
+      SSH_LOGIN="$( echo "$SSH_LOGIN" | sed "s!ssh!$SSH_BIN!" )"
+      $SSH_LOGIN
+   fi
 }
 
 #------
@@ -269,11 +292,9 @@ parse_argv
 create_hist_file
 get_ssh_pid
 get_curr_conn
-check_conn
-get_hist_conn
-eliminate_dups
+check_conn_exists
+read_hist_file
 print_curr_conn
-cleanup_hist
 print_hist_conn
 read_input
 validate_input
