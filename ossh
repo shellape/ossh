@@ -147,8 +147,10 @@ read_hist_file() {
                break
             fi
          done
-         $duplicate || HIST_ARR[ ${j:=0} ]="$hist_line"
-         j=$(( $j + 1 ))
+         if ! $duplicate; then
+            HIST_ARR[ ${j:=0} ]="$hist_line"
+            j=$(( $j + 1 ))
+         fi
       done < $HIST_FILE
    fi
 }
