@@ -4,7 +4,7 @@
 #                establish a further one if requested.
 # author:        vd@ghostshell.de
 # version:       0.1
-# tested on:     Debian Wheezy
+# tested on:     Debian Wheezy, Debian Jessie
 # last modified: 2015-07
 # vim: ts=3 sw=3 sts=3 et ai ci
 
@@ -18,12 +18,11 @@ HIST_FILE=~/.ossh_history
 MAX_HIST_LINES=16
 # Optional bash compatible regex for ssh connections which
 # should not appear in the connection overview at all.
-CONN_EXCL_RE='sshfs|sftp|scp'
-# Optional sed compatible regex to strip off a part of
-# of the ssh command in the connection overview.
-SSH_STRIP_RE=''
-# I you're using a wrapper to call ssh or an alias
-# you can specify it here.
+CONN_EXCL_RE='sshfs|sftp|scp| -fnN '
+# Optional sed compatible expression to strip off a part of the ssh command
+# in the connection overview. e.g. SSH_STRIP_EXPR='s/ .*foobar//'
+SSH_STRIP_EXPR=''
+# I you're using a wrapper to call ssh you can specify it here.
 SSH_BIN=
 
 # Above variables can also be sourced via include config.
@@ -101,31 +100,20 @@ create_hist_file() {
    fi
 }
 
-get_ssh_pid() {
-   SSH_CLIENT_PID=$( lsof -n -iTCP -sTCP:ESTABLISHED | awk '$1=="ssh"{ print $2 }' )
-}
-
 get_curr_conn() {
-   local ps_list ssh_client_cmd
-   if [[ -n $SSH_CLIENT_PID ]]; then
-      ps_list=$( ps -eo pid,args | grep '[s]sh' )
-      for pid in $SSH_CLIENT_PID; do
-         ssh_client_cmd="$( echo "$ps_list" \
-                        | awk -v pid=$pid '$1==pid{$1=""; sub(/^ /,""); print $0; exit}' )"
+   local ps_list="$( ps -C ssh -o args hww )"
+   if [[ -n $ps_list ]]; then
+      while read ssh_client_cmd; do
          if [[ $ssh_client_cmd =~ ${CONN_EXCL_RE:-^$} ]]; then
             continue
          else
             CONN_ARR[ ${i:=0} ]="$ssh_client_cmd"
             i=$(( $i + 1 ))
          fi
-      done
+      # Notice the use of process substition!
+      done < <( echo "$ps_list" | sort -u )
    fi
-   # Unique items in connection array.
-   # The array expansion via wildcard is necessary here.
-   # sort has to be called twice. First to unique, then to
-   # sort by IP. If called at once some entries will get lost.
-   IFS=$'\n' CONN_ARR=( $( echo "${CONN_ARR[*]}" | sort -u | sort -nt'.' -k 1,1 -k 2,2 -k 3,3 -k 4,4 ) )
-   unset IFS
+
 }
 
 check_conn_exists() {
@@ -133,6 +121,15 @@ check_conn_exists() {
    if [[ -z $CONN_ARR ]] && [[ ! -s $HIST_FILE ]]; then
       echo "No current ssh connections and $HIST_FILE is empty." >&2
       exit 1
+   fi
+}
+
+strip_off() {
+   local line="$@"
+   if [[ -n $SSH_STRIP_EXPR ]]; then
+      echo "$line" | sed "$SSH_STRIP_EXPR"
+   else
+      echo "$line"
    fi
 }
 
@@ -145,7 +142,10 @@ read_hist_file() {
          # Check if entry is already in conn array. If so skip.
          for x in ${!CONN_ARR[@]}; do
             conn_line="$( strip_off "${CONN_ARR[ $x ]}" )"
-            [[ $conn_line = $hist_line ]] && duplicate=true
+            if [[ $conn_line = $hist_line ]]; then
+               duplicate=true
+               break
+            fi
          done
          $duplicate || HIST_ARR[ ${j:=0} ]="$hist_line"
          j=$(( $j + 1 ))
@@ -156,15 +156,6 @@ read_hist_file() {
 check_auto_flag() {
    if [[ ${#CONN_ARR[@]} -eq 1 ]] && $AUTO_FLAG; then
       INDEX=1
-   fi
-}
-
-strip_off() {
-   local line="$@"
-   if [[ -n $SSH_STRIP_RE ]]; then
-     echo "$line" | sed "s/$SSH_STRIP_RE//"
-   else
-     echo "$line"
    fi
 }
 
@@ -270,7 +261,7 @@ write_hist() {
             echo "$line"
          done }  \
             | sed '/^[ \t]*$/d' \
-            | sort -u \
+            | sort -ur \
             | head -n "$MAX_HIST_LINES" > $HIST_FILE
    fi
 }
@@ -279,7 +270,7 @@ do_ssh_login() {
    if [[ -z $SSH_BIN ]]; then
       $SSH_LOGIN
    else
-      SSH_LOGIN="$( echo "$SSH_LOGIN" | sed "s!ssh!$SSH_BIN!" )"
+      SSH_LOGIN="$( echo "$SSH_LOGIN" | sed "s;ssh;$SSH_BIN;" )"
       $SSH_LOGIN
    fi
 }
@@ -290,7 +281,6 @@ do_ssh_login() {
 
 parse_argv
 create_hist_file
-get_ssh_pid
 get_curr_conn
 check_conn_exists
 read_hist_file
