@@ -246,7 +246,7 @@ build_ssh_cmd() {
       fi
       # To stay MacOS compatible avoid the use of sed's "-r" parameter.
       SSH_LOGIN="$( echo "$ssh_client_cmd" \
-                  | sed "s/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr/" )"
+                     | sed "s/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr/" )"
    else
       SSH_LOGIN="$ssh_client_cmd"
    fi
