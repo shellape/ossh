@@ -23,7 +23,7 @@ CONN_EXCL_RE='sshfs|sftp|scp| -fnN '
 # in the connection overview. e.g. SSH_STRIP_EXPR='s/ .*foobar//'
 SSH_STRIP_EXPR=''
 # I you're using a wrapper to call ssh you can specify it here.
-SSH_BIN=
+SSH_BIN=''
 
 # Above variables can also be sourced via include config.
 INCLUDE_CONF=~/.ossh_include.conf
