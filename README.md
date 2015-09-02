@@ -44,11 +44,13 @@ Hints
 * Passing the parameter [-a|--auto] provides the possibility to auto login if there is only
   one unique current connection instead of printing the overview and asking for a connection id.
 * If you know what the overview looks like you can pass the id direclty, e.g. "ossh 1" or "ossh 4"
-* There are global variables in the script header. Read the script's comment about the variable $EXCLUDE_RE for further information. Default values:
+* There are global variables in the script header. Read the script's comments for further information. Default values:
 ```
 HIST_FILE=~/.ossh_history
-MAX_HIST_LINES=6
-EXCLUDE_RE='sshfs|scp'
+MAX_HIST_LINES=16
+CONN_EXCL_RE='sshfs|sftp|scp| -fnN '
+SSH_STRIP_EXPR=''
+SSH_BIN=''
 ```
 
 Known Problems
