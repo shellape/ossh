@@ -5,7 +5,7 @@
 # author:        vd@ghostshell.de
 # version:       0.1
 # tested on:     Debian Wheezy, Debian Jessie
-# last modified: 2015-07
+# last modified: 2015-12
 # vim: ts=3 sw=3 sts=3 et ai ci
 
 set -e
@@ -24,6 +24,8 @@ CONN_EXCL_RE='sshfs|sftp|scp| -fnN '
 SSH_STRIP_EXPR=''
 # I you're using a wrapper to call ssh you can specify it here.
 SSH_BIN=''
+# ping parameters
+PING_PARAM='-c3 -w10'
 
 # Above variables can also be sourced via include config.
 INCLUDE_CONF=~/.ossh_include.conf
@@ -35,9 +37,11 @@ INCLUDE_CONF=~/.ossh_include.conf
 
 PROG_NAME=${0##*/}
 ARGV=$@
-VALIDATION_PATTERN='^([0-9]{1,3}){0,1}([+-][0-9]{1,3}){0,1}$'
+INDEX_REGEX='^([0-9]{1,3}){0,1}p?([+-][0-9]{1,3}){0,1}p?$'
+IP_V4_REGEX='([0-9]+\.){3}[0-9]+'
 AUTO_FLAG=false
 LIST_FLAG=false
+PING_FLAG=false
 
 #-----------
 # Functions
@@ -45,37 +49,47 @@ LIST_FLAG=false
 
 usage() {
 cat <<EOF
-Usage: $PROG_NAME [index] [-l|--list] [-a|--auto] [-h|--help]
+Usage: $PROG_NAME [-l|--list] [-a|--auto] [-h|--help] [index]
+
 List or establish ssh connections.
 
 Options:
- index      specify a numeric index to use from the overview, 
-            e.g. "2" or "+3" or "4+1" or "-2" or "3-1"
  -l|--list  only list connections, do not a ask for a connection id
             (mutually exclusive with "index", supersedes "-a")
- -a|--auto  auto login if there is only one unique current connection
+ -a|--auto  auto login (or ping) if there is only one unique current connection
+            (superseded by "index")
  -h|--help  show this help
+ index      specify a numeric index to use from the overview, e.g. "2" or "4"
+            using +/- modifies ip's last octett of the choosen index, e.g. "+3" or "4-2"
+            (appending "p" to "index" will just ping the ip, e.g. "2p" or "4+6p"
 
 EOF
 }
 
 parse_argv() {
    for arg in $ARGV; do
-      if [[ $arg =~ ^(-h|--help)$ ]]; then
+      # Have to work with if statements and regex to support short parameter without space delimiter.
+      if [[ $arg =~ ^-(l|la|al|-list)$ ]]; then
+         LIST_FLAG=true
+      #else
+      #   UNKNWON_ARG=true
+      fi
+      if [[ $arg =~ ^-(a|al|la|-auto)$ ]]; then
+         AUTO_FLAG=true
+      fi
+      if [[ $arg =~ -h|--help ]]; then
          usage
-         exit
-      elif [[ $arg =~ ^(-a|--auto)$ ]]; then
-         AUTO_FLAG=true
-      elif [[ $arg =~ ^(-l|--list)$ ]]; then
-         LIST_FLAG=true
-      elif [[ $arg =~ ^(-la|-al)$ ]]; then
-         AUTO_FLAG=true
-         LIST_FLAG=true
-      elif [[ $arg =~ $VALIDATION_PATTERN ]]; then
+         exit 0
+      fi
+      if [[ $arg =~ $INDEX_REGEX ]]; then
          INDEX=$arg
-      else
-         echo "$arg: invalid parameter." >&2
-         echo "Try '$PROG_NAME -h' for more information." >&2
+         if [[ $arg =~ p ]]; then
+            PING_FLAG=true
+         fi
+      fi
+      if [[ ! $arg =~ $INDEX_REGEX|^-(a|l|al|la|-list|-auto)$ ]]; then
+         printf '%s\n\n' "Unknown command line option: $arg"
+         usage
          exit 1
       fi
    done
@@ -156,7 +170,7 @@ read_hist_file() {
 }
 
 check_auto_flag() {
-   if [[ ${#CONN_ARR[@]} -eq 1 ]] && $AUTO_FLAG; then
+   if [[ ${#CONN_ARR[@]} -eq 1 ]] && $AUTO_FLAG && [[ -z $INDEX ]]; then
       INDEX=1
    fi
 }
@@ -187,23 +201,27 @@ read_input() {
    if [[ -n $INDEX ]]; then
       INPUT="$INDEX"
    else
-      echo -n '>id: '
+      printf '%s: ' '>id'
       read INPUT
    fi
 }
 
 validate_input() {
-   if [[ ! $INPUT =~ $VALIDATION_PATTERN ]]; then
-      echo "Invalid input." >&2
+   if [[ ! $INPUT =~ $INDEX_REGEX ]]; then
+      printf '\n%s\n\n' "Invalid input: $INPUT" >&2
       usage
       exit 1
    fi
 }
 
-build_ssh_cmd() {
+build_action_cmd() {
    local conn_id add_val ssh_client_cmd ip_addr last_oct new_last_oct new_ip_addr
    # Remove all leading zeros, example INPUT: "04+01".
    INPUT=$( echo $INPUT | sed 's/^0*//; s/+0*/+/; s/-0*/-/' )
+   if [[ $INPUT =~ p ]]; then
+      INPUT=${INPUT/p/}
+      PING_FLAG=true
+   fi
    # Split off connection id and subtract 1 since array index starts with 0.
    conn_id=${INPUT%[+-]*}
    if [[ -n $conn_id ]] && [[ $conn_id -ne 0 ]]; then
@@ -232,7 +250,7 @@ build_ssh_cmd() {
    fi
 
    if [[ -n $add_val ]]; then
-      if ! ip_addr=$( echo $ssh_client_cmd | grep -Eo '([0-9]+\.){3}[0-9]+' ); then
+      if ! ip_addr=$( echo $ssh_client_cmd | grep -Eo "$IP_V4_REGEX" ); then
          echo "Could not match an IPv4 in \"$ssh_client_cmd\"." >&2
          exit 1
       fi
@@ -250,9 +268,19 @@ build_ssh_cmd() {
    else
       SSH_LOGIN="$ssh_client_cmd"
    fi
+
+   if $PING_FLAG; then
+      PING_TARGET="$( echo $SSH_LOGIN | grep -Eo "$IP_V4_REGEX" )" || true
+      if [[ -n $PING_TARGET ]]; then
+         PING_CMD="ping $PING_PARAM $PING_TARGET"
+      else
+         echo "Could not match an IPv4 in \"$ssh_client_cmd\"" >&2
+      fi
+   fi
 }
 
 write_hist() {
+   $PING_FLAG && return
    local stripped_ssh_login="$( strip_off "$SSH_LOGIN" )"
 
    if [[ -n $HIST_FILE ]] && [[ $MAX_HIST_LINES -gt 0 ]]; then
@@ -268,7 +296,11 @@ write_hist() {
    fi
 }
 
-do_ssh_login() {
+exec_action_cmd() {
+   if $PING_FLAG; then
+      $PING_CMD
+      exit $?
+   fi
    if [[ -z $SSH_BIN ]]; then
       $SSH_LOGIN
    else
@@ -290,6 +322,6 @@ print_curr_conn
 print_hist_conn
 read_input
 validate_input
-build_ssh_cmd
+build_action_cmd
 write_hist
-do_ssh_login
+exec_action_cmd

@@ -2,15 +2,16 @@
 ossh manager
 =============
 
-The ossh manager shows open ssh connections and the user can establish a further based on the information.
+The ossh manager shows open ssh connections and the user can establish a connection based on the shown information.
 
 Features
 -------
 
 * show open ssh connections
-* show recent used connections via ossh (history)
-* open new ssh connections
-* increase v4 ip address
+* show recently used ssh connections (via ossh history file)
+* open new ssh connection
+* increase/decrease ip v4 address you see in ossh overview
+  used as new ssh host to connect to
 
 Walkthrough
 -------
@@ -43,7 +44,8 @@ Hints
 * Passing the parameter [-l|--list] just lists the connection overview without asking for a connection id.
 * Passing the parameter [-a|--auto] provides the possibility to auto login if there is only
   one unique current connection instead of printing the overview and asking for a connection id.
-* If you know what the overview looks like you can pass the id direclty, e.g. "ossh 1" or "ossh 4"
+* If you know what the overview looks like you can pass the id direclty, e.g. "ossh 1" or "ossh 4+2"
+* Passing a trailing "p" to the "index" will just ping the ip, e.g. "2p" or "8p-2" or "6+2p".
 * There are global variables in the script header. Read the script's comments for further information. Default values:
 ```
 HIST_FILE=~/.ossh_history
@@ -51,17 +53,20 @@ MAX_HIST_LINES=16
 CONN_EXCL_RE='sshfs|sftp|scp| -fnN '
 SSH_STRIP_EXPR=''
 SSH_BIN=''
+PING_PARAM='-c3 -w10'
+INCLUDE_CONF=~/.ossh_include.conf
 ```
 
 Known Problems
 -------
 
-* increasing ip with v6 is not working
+* increasing/decreasing an ip v6 address is not supported
+* increasing/decreasing applied to a hostname is not supported since there's no reverse lookup
 
 Author
 -------
 
-* vd <vd@ghostshell.de>
+* Vladimir <vd@ghostshell.de>
 
 License
 -------
