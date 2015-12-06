@@ -1,8 +1,8 @@
 
-ossh manager
+ossh - ssh connection manager
 =============
 
-The ossh manager shows open ssh connections and the user can establish a connection based on the shown information.
+ossh shows open ssh connections and the user can establish a connection based on the shown information.
 
 Features
 -------
