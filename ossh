@@ -298,6 +298,7 @@ write_hist() {
 
 exec_action_cmd() {
    if $PING_FLAG; then
+      echo
       $PING_CMD
       exit $?
    fi
