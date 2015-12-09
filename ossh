@@ -37,11 +37,12 @@ INCLUDE_CONF=~/.ossh_include.conf
 
 PROG_NAME=${0##*/}
 ARGV=$@
-INDEX_REGEX='^([0-9]{1,3}){0,1}p?([+-][0-9]{1,3}){0,1}p?$'
+INDEX_REGEX='^$|^[0-9]{0,2}[+-]?[0-9]{1,3}p?$|^[0-9]{0,2}p?[+-]?[0-9]{1,3}$'
 IP_V4_REGEX='([0-9]+\.){3}[0-9]+'
 AUTO_FLAG=false
 LIST_FLAG=false
 PING_FLAG=false
+TEST_FLAG=false
 
 #-----------
 # Functions
@@ -68,11 +69,22 @@ EOF
 
 parse_argv() {
    for arg in $ARGV; do
+      # Not documented test parameter (e.g. for contributors).
+      # Passing an argument to "-t" just shows if the argument would be a valid "index".
+      if [[ $arg = -t ]] || $TEST_FLAG; then
+         if ! $TEST_FLAG; then
+            TEST_FLAG=true
+            continue
+         fi
+         if [[ $arg != -t ]]; then
+            INPUT="$arg"
+            validate_input
+            cleanup_input
+         fi
+      fi
       # Have to work with if statements and regex to support short parameter without space delimiter.
       if [[ $arg =~ ^-(l|la|al|-list)$ ]]; then
          LIST_FLAG=true
-      #else
-      #   UNKNWON_ARG=true
       fi
       if [[ $arg =~ ^-(a|al|la|-auto)$ ]]; then
          AUTO_FLAG=true
@@ -82,14 +94,20 @@ parse_argv() {
          exit 0
       fi
       if [[ $arg =~ $INDEX_REGEX ]]; then
-         INDEX=$arg
+         if [[ -z $INDEX ]]; then
+            INDEX=$arg
+         else
+            echo 'Passing "index" multiple times is not supported.' >&2
+            printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
+            exit 1
+         fi
          if [[ $arg =~ p ]]; then
             PING_FLAG=true
          fi
       fi
       if [[ ! $arg =~ $INDEX_REGEX|^-(a|l|al|la|-list|-auto)$ ]]; then
-         printf '%s\n\n' "Unknown command line option: $arg"
-         usage
+         printf 'Unknown command line option: %s\n' $arg
+         printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
          exit 1
       fi
    done
@@ -100,7 +118,7 @@ parse_argv() {
 
    if $LIST_FLAG && [[ -n $INDEX ]]; then
       echo "Specified parameters are mutually exclusive." >&2
-      echo "Try \"$PROG_NAME -h\" for more information." >&2
+      printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
       exit 1
    fi
 }
@@ -208,20 +226,39 @@ read_input() {
 
 validate_input() {
    if [[ ! $INPUT =~ $INDEX_REGEX ]]; then
-      printf '\n%s\n\n' "Invalid input: $INPUT" >&2
-      usage
-      exit 1
+      if $TEST_FLAG; then
+         printf 'invalid: %s, ' "$INPUT"
+      else
+         printf 'Invalid input: %s\n' "$INPUT" >&2
+         printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
+         exit 1
+      fi
+   else
+      if $TEST_FLAG; then
+         printf 'valid: %s, ' "$INPUT"
+      fi
+   fi
+   if [[ $INPUT =~ p ]]; then
+      INPUT=${INPUT/p/}
+      PING_FLAG=true
+   fi
+}
+
+cleanup_input() {
+   # Remove all leading zeros, example INPUT: "04+01".
+   INPUT=$( echo $INPUT \
+            | sed 's/^0*//' \
+            | sed 's/[+-]0*$//' \
+            | sed 's/+0*/+/' \
+            | sed 's/-0*/-/' )
+   if $TEST_FLAG; then
+     printf 'INPUT: %s, PING_FLAG: %s\n' "$INPUT" "$PING_FLAG"
+     exit
    fi
 }
 
 build_action_cmd() {
    local conn_id add_val ssh_client_cmd ip_addr last_oct new_last_oct new_ip_addr
-   # Remove all leading zeros, example INPUT: "04+01".
-   INPUT=$( echo $INPUT | sed 's/^0*//; s/+0*/+/; s/-0*/-/' )
-   if [[ $INPUT =~ p ]]; then
-      INPUT=${INPUT/p/}
-      PING_FLAG=true
-   fi
    # Split off connection id and subtract 1 since array index starts with 0.
    conn_id=${INPUT%[+-]*}
    if [[ -n $conn_id ]] && [[ $conn_id -ne 0 ]]; then
@@ -251,7 +288,7 @@ build_action_cmd() {
 
    if [[ -n $add_val ]]; then
       if ! ip_addr=$( echo $ssh_client_cmd | grep -Eo "$IP_V4_REGEX" ); then
-         echo "Could not match an IPv4 in \"$ssh_client_cmd\"." >&2
+         printf 'Could not match an IPv4 in "%s".\n' "$ssh_client_cmd" >&2
          exit 1
       fi
       last_oct=${ip_addr##*.}
@@ -274,7 +311,7 @@ build_action_cmd() {
       if [[ -n $PING_TARGET ]]; then
          PING_CMD="ping $PING_PARAM $PING_TARGET"
       else
-         echo "Could not match an IPv4 in \"$ssh_client_cmd\"" >&2
+         printf 'Could not match an IPv4 in "%s".\n' "$ssh_client_cmd" >&2
       fi
    fi
 }
@@ -323,6 +360,7 @@ print_curr_conn
 print_hist_conn
 read_input
 validate_input
+cleanup_input
 build_action_cmd
 write_hist
 exec_action_cmd
