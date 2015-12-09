@@ -267,7 +267,7 @@ get_ip_fqdn() {
       echo "$ip_addr"
    else
       if fqdn=$( echo $line | grep -Eo "$FQDN_REGEX" ); then
-         ip_addr=$( host $fqdn | awk 'NR==1{print $NF}' )
+         ip_addr=$( host -4 $fqdn | awk 'NR==1{print $NF}' )
          if [[ ${PIPESTATUS[0]} != 0 ]]; then
             printf '\nCould not resolve IPv4 in "%s".\n' "$line" >&2
             exit 1
@@ -340,6 +340,9 @@ build_action_cmd() {
          ip_addr=$new_ip_addr
       else
          read ip_addr fqdn < <( get_ip_fqdn $ssh_client_cmd )
+         # Since there's no operation on FQDN keep it visual
+         # for the user and let ping resolve the address.
+         ip_addr=$fqdn
       fi
       PING_CMD="ping $PING_PARAM $ip_addr"
    fi
