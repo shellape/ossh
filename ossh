@@ -37,8 +37,11 @@ INCLUDE_CONF=~/.ossh_include.conf
 
 PROG_NAME=${0##*/}
 ARGV=$@
+# bash compatible regex
 INDEX_REGEX='^$|^[0-9]{0,2}[+-]?[0-9]{1,3}p?$|^[0-9]{0,2}p?[+-]?[0-9]{1,3}$'
+# grep compatible extended regex
 IP_V4_REGEX='([0-9]+\.){3}[0-9]+'
+FQDN_REGEX='[a-zA-Z0-9.-]{1,}\.[a-zA-Z]{2,}'
 AUTO_FLAG=false
 LIST_FLAG=false
 PING_FLAG=false
@@ -257,8 +260,33 @@ cleanup_input() {
    fi
 }
 
+get_ip_fqdn() {
+   local line="$@"
+   local ip_addr
+   if ip_addr=$( echo $line | grep -Eo "$IP_V4_REGEX" ); then
+      echo "$ip_addr"
+   else
+      if fqdn=$( echo $line | grep -Eo "$FQDN_REGEX" ); then
+         ip_addr=$( host $fqdn | awk 'NR==1{print $NF}' )
+         if [[ ${PIPESTATUS[0]} != 0 ]]; then
+            printf '\nCould not resolve IPv4 in "%s".\n' "$line" >&2
+            exit 1
+         fi
+         if [[ $ip_addr =~ $IP_V4_REGEX ]]; then
+            echo "$ip_addr $fqdn"
+         else
+            printf '\nCould not match an IPv4 in "%s".\n' "$ip_addr" >&2 
+            exit 1
+         fi
+      else
+         printf '\nCould not match an FQDN in "%s".\n' "$line" >&2   
+         exit 1
+      fi
+   fi
+}
+
 build_action_cmd() {
-   local conn_id add_val ssh_client_cmd ip_addr last_oct new_last_oct new_ip_addr
+   local conn_id add_val ssh_client_cmd ip_addr fqdn last_oct new_last_oct new_ip_addr
    # Split off connection id and subtract 1 since array index starts with 0.
    conn_id=${INPUT%[+-]*}
    if [[ -n $conn_id ]] && [[ $conn_id -ne 0 ]]; then
@@ -287,32 +315,33 @@ build_action_cmd() {
    fi
 
    if [[ -n $add_val ]]; then
-      if ! ip_addr=$( echo $ssh_client_cmd | grep -Eo "$IP_V4_REGEX" ); then
-         printf 'Could not match an IPv4 in "%s".\n' "$ssh_client_cmd" >&2
-         exit 1
-      fi
+      read ip_addr fqdn < <( get_ip_fqdn $ssh_client_cmd )
       last_oct=${ip_addr##*.}
       new_last_oct=$(( $last_oct + $add_val ))
       new_ip_addr="${ip_addr%.*}.$new_last_oct"
       # Primitive sanity check.
       if [[ ! $new_last_oct -ge 1 ]] || [[ ! $new_last_oct -le 255 ]]; then
-         echo "$new_last_oct not within meaningful IPv4 range." >&2
+         echo '\n%s not within meaningful IPv4 range.' "$new_last_oct" >&2
          exit 1
       fi
-      # To stay MacOS compatible avoid the use of sed's "-r" parameter.
-      SSH_LOGIN="$( echo "$ssh_client_cmd" \
-                     | sed "s/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr/" )"
+      if [[ -n $fqdn ]]; then 
+         SSH_LOGIN="$( echo "$ssh_client_cmd" | sed "s/$fqdn/$new_ip_addr/" )"
+      else
+         # To stay MacOS compatible avoid the use of sed's "-r" parameter.
+         SSH_LOGIN="$( echo "$ssh_client_cmd" \
+                        | sed "s/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr/" )"
+      fi
    else
       SSH_LOGIN="$ssh_client_cmd"
    fi
 
    if $PING_FLAG; then
-      PING_TARGET="$( echo $SSH_LOGIN | grep -Eo "$IP_V4_REGEX" )" || true
-      if [[ -n $PING_TARGET ]]; then
-         PING_CMD="ping $PING_PARAM $PING_TARGET"
+      if [[ -n $new_ip_addr ]]; then
+         ip_addr=$new_ip_addr
       else
-         printf 'Could not match an IPv4 in "%s".\n' "$ssh_client_cmd" >&2
+         read ip_addr fqdn < <( get_ip_fqdn $ssh_client_cmd )
       fi
+      PING_CMD="ping $PING_PARAM $ip_addr"
    fi
 }
 
