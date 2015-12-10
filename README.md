@@ -46,7 +46,7 @@ Hints
   one unique current connection instead of printing the overview and asking for a connection id.
 * If you know what the overview looks like you can pass the id direclty, e.g. "ossh 1" or "ossh 4+2"
 * Passing a trailing "p" to the "index" will just ping the ip, e.g. "2p" or "8p-2" or "6+2p".
-* If using a FQDN as ssh target a name lookup will be performed.
+* If there's a FQDN in the ossh overview a name lookup will be performed when increasing/decreasing.
 * There are global variables in the script header. Read the script's comments for further information. Default values:
 ```
 HIST_FILE=~/.ossh_history
@@ -55,6 +55,7 @@ CONN_EXCL_RE='sshfs|sftp|scp| -fnN '
 SSH_STRIP_EXPR=''
 SSH_BIN=''
 PING_PARAM='-c3 -w10'
+HOST_PARAM='-4 -t A'
 INCLUDE_CONF=~/.ossh_include.conf
 ```
 

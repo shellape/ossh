@@ -24,8 +24,9 @@ CONN_EXCL_RE='sshfs|sftp|scp| -fnN '
 SSH_STRIP_EXPR=''
 # I you're using a wrapper to call ssh you can specify it here.
 SSH_BIN=''
-# ping parameters
+# command parameters
 PING_PARAM='-c3 -w10'
+HOST_PARAM='-4 -t A'
 
 # Above variables can also be sourced via include config.
 INCLUDE_CONF=~/.ossh_include.conf
@@ -38,9 +39,10 @@ INCLUDE_CONF=~/.ossh_include.conf
 PROG_NAME=${0##*/}
 ARGV=$@
 # bash compatible regex
-INDEX_REGEX='^$|^[0-9]{0,2}[+-]?[0-9]{1,3}p?$|^[0-9]{0,2}p?[+-]?[0-9]{1,3}$'
-# grep compatible extended regex
+INDEX_REGEX='^p?$|^[0-9]{0,2}[+-]?[0-9]{1,3}p?$|^[0-9]{0,2}p?[+-]?[0-9]{1,3}$'
+# grep and bash compatible extended regex
 IP_V4_REGEX='([0-9]+\.){3}[0-9]+'
+# grep compatible extended regex
 FQDN_REGEX='[a-zA-Z0-9.-]{1,}\.[a-zA-Z]{2,}'
 AUTO_FLAG=false
 LIST_FLAG=false
@@ -262,12 +264,12 @@ cleanup_input() {
 
 get_ip_fqdn() {
    local line="$@"
-   local ip_addr
+   local ip_addr fqdn
    if ip_addr=$( echo $line | grep -Eo "$IP_V4_REGEX" ); then
       echo "$ip_addr"
    else
       if fqdn=$( echo $line | grep -Eo "$FQDN_REGEX" ); then
-         ip_addr=$( host -4 $fqdn | awk 'NR==1{print $NF}' )
+         ip_addr=$( host $HOST_PARAM $fqdn | awk 'NR==1{print $NF}' )
          if [[ ${PIPESTATUS[0]} != 0 ]]; then
             printf '\nCould not resolve IPv4 in "%s".\n' "$line" >&2
             exit 1
@@ -340,7 +342,7 @@ build_action_cmd() {
          ip_addr=$new_ip_addr
       else
          read ip_addr fqdn < <( get_ip_fqdn $ssh_client_cmd )
-         # Since there's no operation on FQDN keep it visual
+         # Since there was no operation on FQDN keep it visual
          # for the user and let ping resolve the address.
          ip_addr=$fqdn
       fi
