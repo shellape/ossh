@@ -343,8 +343,8 @@ build_action_cmd() {
       else
          read ip_addr fqdn < <( get_ip_fqdn $ssh_client_cmd )
          # Since there was no operation on FQDN keep it visual
-         # for the user and let ping resolve the address.
-         ip_addr=$fqdn
+         # for the user (if set) and let ping resolve the address.
+         ip_addr=${fqdn:-$ip_addr}
       fi
       PING_CMD="ping $PING_PARAM $ip_addr"
    fi
