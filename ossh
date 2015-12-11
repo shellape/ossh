@@ -111,7 +111,7 @@ parse_argv() {
          fi
       fi
       if [[ ! $arg =~ $INDEX_REGEX|^-(a|l|al|la|-list|-auto)$ ]]; then
-         printf 'Unknown command line option: %s\n' $arg
+         printf 'Unknown command line option: %s\n' $arg >&2
          printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
          exit 1
       fi
