@@ -25,7 +25,7 @@ SSH_STRIP_EXPR=''
 # I you're using a wrapper to call ssh you can specify it here.
 SSH_BIN=''
 # command parameters
-PING_PARAM='-c3 -w10'
+PING_PARAM='-c3'
 HOST_PARAM='-4 -t A'
 
 # Above variables can also be sourced via include config.
