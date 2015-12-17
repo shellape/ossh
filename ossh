@@ -362,7 +362,6 @@ write_hist() {
             echo "$line"
          done }  \
             | sed '/^[ \t]*$/d' \
-            | sort -ur \
             | head -n "$MAX_HIST_LINES" > $HIST_FILE
    fi
 }
