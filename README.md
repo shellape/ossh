@@ -54,7 +54,7 @@ MAX_HIST_LINES=16
 CONN_EXCL_RE='sshfs|sftp|scp| -fnN '
 SSH_STRIP_EXPR=''
 SSH_BIN=''
-PING_PARAM='-c3 -w10'
+PING_PARAM='-c3'
 HOST_PARAM='-4 -t A'
 INCLUDE_CONF=~/.ossh_include.conf
 ```
