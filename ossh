@@ -41,7 +41,7 @@ ARGV=$@
 # bash compatible regex
 INDEX_REGEX='^p?$|^[0-9]{0,2}[+-]?[0-9]{1,3}p?$|^[0-9]{1,2}p?[+-]?[0-9]{1,3}$'
 # bash compatible regex (needs improvement)
-PARAM_REGEX='^-(a?l?r?|a?r?l?|l?a?r?|l?r?a?|r?a?l?|r?l?a?)$|^(--list|--auto|--rev)$|^-t$'
+PARAM_REGEX='^-(a?l?r?|a?r?l?|l?a?r?|l?r?a?|r?a?l?|r?l?a?)$|^--(list|auto|rev|help)$|^-(t|h)$'
 # grep and bash compatible extended regex
 IP_V4_REGEX='([0-9]+\.){3}[0-9]+'
 # grep compatible extended regex
@@ -104,6 +104,10 @@ parse_argv() {
          exit 1
       fi
       # Have to work with if statements and regex to support short parameter without space delimiter.
+      if [[ $arg =~ ^(-h|--help)$ ]]; then
+         usage
+         exit 0
+      fi
       if [[ $arg =~ -?(a|-auto$) ]]; then
          AUTO_FLAG=true
       fi
@@ -112,10 +116,6 @@ parse_argv() {
       fi
       if [[ $arg =~ -?(r|-rev$) ]]; then
          REVERSE_FLAG=true
-      fi
-      if [[ $arg =~ ^(-h|--help)$ ]]; then
-         usage
-         exit 0
       fi
       if [[ $arg =~ $INDEX_REGEX ]]; then
          if [[ -z $INDEX ]]; then
@@ -235,7 +235,7 @@ print_hist_conn() {
    for i in "${!HIST_ARR[@]}"; do
       printf "[%02d] %s\n" $(( ${#CONN_ARR[@]} + $i + 1 )) "${HIST_ARR[ $i ]}"
    done | ${SORT:-cat}
-   $REVERSE_FLAG && echo '[-a]'
+   $REVERSE_FLAG && echo '[-a]' || true
 }
 
 print_all_conn() {
