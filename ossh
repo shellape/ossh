@@ -40,6 +40,8 @@ PROG_NAME=${0##*/}
 ARGV=$@
 # bash compatible regex
 INDEX_REGEX='^p?$|^[0-9]{0,2}[+-]?[0-9]{1,3}p?$|^[0-9]{0,2}p?[+-]?[0-9]{1,3}$'
+# bash compatible regex (needs improvement)
+PARAM_REGEX='^-(a?l?r?|a?r?l?|l?a?r?|l?r?a?|r?a?l?|r?l?a?)$|(--list|--auto|--rev)$'
 # grep and bash compatible extended regex
 IP_V4_REGEX='([0-9]+\.){3}[0-9]+'
 # grep compatible extended regex
@@ -48,6 +50,7 @@ AUTO_FLAG=false
 LIST_FLAG=false
 PING_FLAG=false
 TEST_FLAG=false
+REVERSE_FLAG=false
 
 #-----------
 # Functions
@@ -55,7 +58,7 @@ TEST_FLAG=false
 
 usage() {
 cat <<EOF
-Usage: $PROG_NAME [-l|--list] [-a|--auto] [-h|--help] [index]
+Usage: $PROG_NAME [-l|--list] [-a|--auto] [-r|--rev] [-h|--help] [index]
 
 List or establish ssh connections.
 
@@ -64,6 +67,7 @@ Options:
             (mutually exclusive with "index", supersedes "-a")
  -a|--auto  auto login (or ping) if there is only one unique current connection
             (superseded by "index")
+ -r|--rev   output will show first history then current connections
  -h|--help  show this help
  index      specify a numeric index to use from the overview, e.g. "2" or "4"
             using +/- modifies ip's last octett of the choosen index, e.g. "+3" or "4-2"
@@ -88,13 +92,16 @@ parse_argv() {
          fi
       fi
       # Have to work with if statements and regex to support short parameter without space delimiter.
-      if [[ $arg =~ ^-(l|la|al|-list)$ ]]; then
-         LIST_FLAG=true
-      fi
-      if [[ $arg =~ ^-(a|al|la|-auto)$ ]]; then
+      if [[ $arg =~ -?(a|-auto$) ]]; then
          AUTO_FLAG=true
       fi
-      if [[ $arg =~ -h|--help ]]; then
+      if [[ $arg =~ -?(l|-list$) ]]; then
+         LIST_FLAG=true
+      fi
+      if [[ $arg =~ -?(r|-rev$) ]]; then
+         REVERSE_FLAG=true
+      fi
+      if [[ $arg =~ ^(-h|--help)$ ]]; then
          usage
          exit 0
       fi
@@ -110,7 +117,7 @@ parse_argv() {
             PING_FLAG=true
          fi
       fi
-      if [[ ! $arg =~ $INDEX_REGEX|^-(a|l|al|la|-list|-auto)$ ]]; then
+      if [[ ! $arg =~ $INDEX_REGEX|$PARAM_REGEX ]]; then
          printf 'Unknown command line option: %s\n' $arg >&2
          printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
          exit 1
@@ -200,11 +207,12 @@ check_auto_flag() {
 
 print_curr_conn() {
    check_auto_flag
+   $REVERSE_FLAG && SORT='sort -rn'
    for x in ${!CONN_ARR[@]}; do
       if [[ -z $INDEX ]]; then
          strip_off $( printf "[%02d] %s\n" $(( $x + 1 )) "${CONN_ARR[ $x ]}" )
       fi
-   done
+   done | ${SORT:-cat}
 }
 
 print_hist_conn() {
@@ -212,10 +220,25 @@ print_hist_conn() {
    if [[ -z $HIST_ARR ]] || [[ -n $INDEX ]]; then
       return
    fi
-   echo '[--]'
+   if $REVERSE_FLAG; then
+      SORT='sort -rn'
+   else
+      echo '[-b]'
+   fi
    for i in "${!HIST_ARR[@]}"; do
       printf "[%02d] %s\n" $(( ${#CONN_ARR[@]} + $i + 1 )) "${HIST_ARR[ $i ]}"
-   done
+   done | ${SORT:-cat}
+   $REVERSE_FLAG && echo '[-a]'
+}
+
+print_all_conn() {
+   if $REVERSE_FLAG; then
+      print_hist_conn
+      print_curr_conn
+   else
+      print_curr_conn
+      print_hist_conn
+   fi
 }
 
 read_input() {
@@ -389,8 +412,7 @@ create_hist_file
 get_curr_conn
 check_conn_exists
 read_hist_file
-print_curr_conn
-print_hist_conn
+print_all_conn
 read_input
 validate_input
 cleanup_input

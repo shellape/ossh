@@ -13,6 +13,28 @@ Features
 * increase/decrease ip v4 address you see in ossh overview
   used as new ssh host to connect to
 
+Builtin help
+-------
+```
+$> ossh -h
+Usage: ossh [-l|--list] [-a|--auto] [-r|--rev] [-h|--help] [index]
+
+List or establish ssh connections.
+
+Options:
+ -l|--list  only list connections, do not a ask for a connection id
+            (mutually exclusive with "index", supersedes "-a")
+ -a|--auto  auto login (or ping) if there is only one unique current connection
+            (superseded by "index")
+ -r|--rev   output will show first history then current connections
+ -h|--help  show this help
+ index      specify a numeric index to use from the overview, e.g. "2" or "4"
+            using +/- modifies ip's last octett of the choosen index, e.g. "+3" or "4-2"
+            (appending "p" to "index" will just ping the ip, e.g. "2p" or "4+6p")
+
+
+```
+
 Walkthrough
 -------
 
@@ -21,7 +43,7 @@ Walkthrough
 # ossh
 [01] ssh 192.168.10.12
 [02] ssh -l root 192.168.10.13
-[--]
+[-b]
 [03] ssh 172.16.20.14
 >id: 1
 ```
@@ -31,7 +53,7 @@ Walkthrough
 # ossh
 [01] ssh 192.168.10.12
 [02] ssh -l root 192.168.10.13
-[--]
+[-b]
 [03] ssh 172.16.20.14
 >id: 2+2
 ```
@@ -40,10 +62,13 @@ Hints
 -------
 
 * For choosing the first entry from the overview you can simply hit enter.
-* "[--]" in the overview implies that all following entries come from the history file.
-* Passing the parameter [-l|--list] just lists the connection overview without asking for a connection id.
-* Passing the parameter [-a|--auto] provides the possibility to auto login if there is only
+* "[-b]" in the overview implies that all entries below come from the history file.
+* Passing the parameter "[-l|--list]" just lists the connection overview without asking for a connection id.
+* Passing the parameter "[-a|--auto]" provides the possibility to auto login if there is only
   one unique current connection instead of printing the overview and asking for a connection id.
+* Passing the parameter "[-r|--rev]" will output first history then current connections.
+  The history indicator changes the from "[-b]" to "[-a]" to show history is above.
+  This is useful if you have quite a lot of history connections and your terminal window is small.
 * If you know what the overview looks like you can pass the id direclty, e.g. "ossh 1" or "ossh 4+2"
 * Passing a trailing "p" to the "index" will just ping the ip, e.g. "2p" or "8p-2" or "6+2p".
 * If there's a FQDN in the ossh overview a name lookup will be performed when increasing/decreasing.
