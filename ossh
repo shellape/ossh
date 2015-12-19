@@ -39,9 +39,9 @@ INCLUDE_CONF=~/.ossh_include.conf
 PROG_NAME=${0##*/}
 ARGV=$@
 # bash compatible regex
-INDEX_REGEX='^p?$|^[0-9]{0,2}[+-]?[0-9]{1,3}p?$|^[0-9]{0,2}p?[+-]?[0-9]{1,3}$'
+INDEX_REGEX='^p?$|^[0-9]{0,2}[+-]?[0-9]{1,3}p?$|^[0-9]{1,2}p?[+-]?[0-9]{1,3}$'
 # bash compatible regex (needs improvement)
-PARAM_REGEX='^-(a?l?r?|a?r?l?|l?a?r?|l?r?a?|r?a?l?|r?l?a?)$|(--list|--auto|--rev)$'
+PARAM_REGEX='^-(a?l?r?|a?r?l?|l?a?r?|l?r?a?|r?a?l?|r?l?a?)$|^(--list|--auto|--rev)$|^-t$'
 # grep and bash compatible extended regex
 IP_V4_REGEX='([0-9]+\.){3}[0-9]+'
 # grep compatible extended regex
@@ -91,6 +91,18 @@ parse_argv() {
             cleanup_input
          fi
       fi
+      # Not documented debug param just to show some important regex.
+      if [[ $arg == --regex ]]; then
+         printf "INDEX_REGEX='%s'\n" "$INDEX_REGEX"
+         printf "PARAM_REGEX='%s'\n" "$PARAM_REGEX" 
+         exit 0
+      fi
+      # Check if allowed parameter or "index" was passed.
+      if [[ ! $arg =~ $INDEX_REGEX|$PARAM_REGEX ]]; then
+         printf 'Unknown command line option: %s\n' $arg >&2
+         printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
+         exit 1
+      fi
       # Have to work with if statements and regex to support short parameter without space delimiter.
       if [[ $arg =~ -?(a|-auto$) ]]; then
          AUTO_FLAG=true
@@ -116,11 +128,6 @@ parse_argv() {
          if [[ $arg =~ p ]]; then
             PING_FLAG=true
          fi
-      fi
-      if [[ ! $arg =~ $INDEX_REGEX|$PARAM_REGEX ]]; then
-         printf 'Unknown command line option: %s\n' $arg >&2
-         printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
-         exit 1
       fi
    done
 
