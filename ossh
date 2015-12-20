@@ -67,7 +67,7 @@ Options:
             (mutually exclusive with "index", supersedes "-a")
  -a|--auto  auto login (or ping) if there is only one unique current connection
             (superseded by "index")
- -r|--rev   output will show first history then current connections
+ -r|--rev   show output in reverse order, first history then current connections
  -h|--help  show this help
  index      specify a numeric index to use from the overview, e.g. "2" or "4"
             using +/- modifies ip's last octett of the choosen index, e.g. "+3" or "4-2"
