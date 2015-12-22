@@ -61,7 +61,7 @@ usage() {
 cat <<EOF
 Usage: $PROG_NAME [-l|--list] [-a|--auto] [-r|--rev] [-h|--help] [index]
 
-List or establish ssh connections.
+List or establish ssh connections
 
 Options:
  -l|--list  only list connections, do not a ask for a connection id
@@ -75,6 +75,7 @@ Options:
             (appending "p" to "index" will just ping the ip, e.g. "2p" or "4+6p")
 
 EOF
+exit 0
 }
 
 parse_argv() {
@@ -109,19 +110,11 @@ parse_argv() {
          exit 1
       fi
       # Have to work with if statements and regex to support short parameter without space delimiter.
-      if [[ $arg =~ ^(-h|--help)$ ]]; then
-         usage
-         exit 0
-      fi
-      if [[ $arg =~ -?(a|-auto$) ]]; then
-         AUTO_FLAG=true
-      fi
-      if [[ $arg =~ -?(l|-list$) ]]; then
-         LIST_FLAG=true
-      fi
-      if [[ $arg =~ -?(r|-rev$) ]]; then
-         REVERSE_FLAG=true
-      fi
+      [[ $arg =~ ^(-h|--help)$ ]] && usage
+      [[ $arg =~ -?(a|-auto$) ]] && AUTO_FLAG=true
+      [[ $arg =~ -?(l|-list$) ]] && LIST_FLAG=true
+      [[ $arg =~ -?(r|-rev$) ]] && REVERSE_FLAG=true
+
       if [[ $arg =~ $INDEX_REGEX ]]; then
          if [[ -z $INDEX ]]; then
             INDEX=$arg
@@ -130,15 +123,11 @@ parse_argv() {
             printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
             exit 1
          fi
-         if [[ $arg =~ p ]]; then
-            PING_FLAG=true
-         fi
+         [[ $arg =~ p ]] && PING_FLAG=true
       fi
    done
 
-   if $AUTO_FLAG && $LIST_FLAG; then
-      AUTO_FLAG=false
-   fi
+   $AUTO_FLAG && $LIST_FLAG && AUTO_FLAG=false
 
    if $LIST_FLAG && [[ -n $INDEX ]]; then
       echo "Specified parameters are mutually exclusive." >&2
