@@ -42,7 +42,7 @@ ARGC=$#
 # bash compatible regex
 INDEX_REGEX='^p?$|^[0-9]{0,2}[+-]?[0-9]{1,3}p?$|^[0-9]{1,2}p?[+-]?[0-9]{1,3}$'
 # bash compatible regex (needs improvement)
-PARAM_REGEX='^-(a?l?r?|a?r?l?|l?a?r?|l?r?a?|r?a?l?|r?l?a?)[lar]$|^--(list|auto|rev|help)$|^-(t|h)$'
+PARAM_REGEX='^-(a?l?r?|a?r?l?|l?a?r?|l?r?a?|r?a?l?|r?l?a?)[lar]$|^--(list|auto|rev|help|regex)$|^-(t|h)$'
 # grep and bash compatible extended regex
 IP_V4_REGEX='([0-9]+\.){3}[0-9]+'
 # grep compatible extended regex
@@ -84,7 +84,7 @@ parse_argv() {
       # Passing an argument to "-t" just shows if the argument would be a valid "index".
       if [[ $arg = -t ]] || $TEST_FLAG; then
          if [[ $ARGC -ne 2 ]]; then
-            echo 'Specify an index to test for "-t".' >&2
+            echo 'Specify exactly one index for "-t" parameter.' >&2
             exit 1
          fi
          if ! $TEST_FLAG; then
@@ -97,17 +97,17 @@ parse_argv() {
             cleanup_input
          fi
       fi
-      # Not documented debug param just to show some important regex.
-      if [[ $arg == --regex ]]; then
-         printf "INDEX_REGEX='%s'\n" "$INDEX_REGEX"
-         printf "PARAM_REGEX='%s'\n" "$PARAM_REGEX" 
-         exit 0
-      fi
       # Check if allowed parameter or "index" was passed.
       if [[ ! $arg =~ $INDEX_REGEX|$PARAM_REGEX ]]; then
          printf 'Unknown command line option: %s\n' $arg >&2
          printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
          exit 1
+      fi
+      # Not documented debug param just to show some important regex.
+      if [[ $arg == --regex ]]; then
+         printf "INDEX_REGEX='%s'\n" "$INDEX_REGEX"
+         printf "PARAM_REGEX='%s'\n" "$PARAM_REGEX"
+         exit 0
       fi
       # Have to work with if statements and regex to support short parameter without space delimiter.
       [[ $arg =~ ^(-h|--help)$ ]] && usage
