@@ -1,0 +1,6 @@
+It's generally recommended to put custom modifications
+to an include file so ossh can be updated without issues.
+
+The default path of the include file is: ~/.ossh_include.conf
+
+Check out the sample config files in this directory.
