@@ -67,7 +67,7 @@ Hints
 * Passing the parameter "[-a|--auto]" provides the possibility to auto login if there is only
   one unique current connection instead of printing the overview and asking for a connection id.
 * Passing the parameter "[-r|--rev]" will output first history then current connections.
-  The history indicator changes the from "[-b]" to "[-a]" to show history is above.
+  The history indicator changes then from "[-b]" to "[-a]" to show history is above.
   This is useful if you have quite a lot of history connections and your terminal window is small.
 * If you know what the overview looks like you can pass the id direclty, e.g. "ossh 1" or "ossh 4+2"
 * Passing a trailing "p" to the "index" will just ping the ip, e.g. "2p" or "8p-2" or "6+2p".
