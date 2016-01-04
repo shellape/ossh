@@ -9,6 +9,8 @@
 # vim: ts=3 sw=3 sts=3 et ai ci
 
 set -e
+# thx to http://wiki.bash-hackers.org/scripting/debuggingtips
+export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
 #-----------------------
 # Gloabl user variables
@@ -51,7 +53,7 @@ FQDN_REGEX='[a-zA-Z0-9.-]{1,}\.[a-zA-Z]{2,}'
 AUTO_FLAG=false
 LIST_FLAG=false
 PING_FLAG=false
-TEST_FLAG=false
+TEST_RUN_FLAG=false
 REVERSE_FLAG=false
 
 #-----------
@@ -79,48 +81,57 @@ EOF
 exit 0
 }
 
+test_run() {
+   local rc err_msg is_valid
+   rc="$1"
+   err_msg="$2"
+   [[ rc -eq 0 ]] && is_valid=VALID || is_valid=INVALID
+   printf '%s; ARGV: "%s"; ERR_MSG: "%s"\n' "$is_valid" "$ARGV" "$err_msg"
+   exit $rc
+}
+
 parse_argv() {
    for arg in $ARGV; do
-      # Not documented test parameter (e.g. for contributors).
-      # Passing an argument to "-t" just shows if the argument would be a valid "index".
-      if [[ $arg = -t ]] || $TEST_FLAG; then
-         if [[ $ARGC -ne 2 ]]; then
-            echo 'Specify exactly one index for "-t" parameter.' >&2
-            exit 1
-         fi
-         if ! $TEST_FLAG; then
-            TEST_FLAG=true
-            continue
-         fi
-         if [[ $arg != -t ]]; then
-            INPUT="$arg"
-            validate_input
-            cleanup_input
+      # Not documented "-t" test-run parameter. It jush shows if parameter and/or "index"
+      # would be valid without performing any action (e.g. useful before commiting changes).
+      # To work properly "-t" must be specified as first parameter.
+      if [[ $arg = -t ]]; then
+         if [[ $ARGC -ge 2 ]] && [[ $ARGC -le 4 ]]; then
+            TEST_RUN_FLAG=true
+         else
+            test_run 1 'min 1, max 3 arguments'
          fi
       fi
+
       # Check if allowed parameter or "index" was passed.
       if [[ ! $arg =~ $INDEX_REGEX|$SHORT_PARAM_REGEX|$LONG_PARAM_REGEX ]]; then
+         $TEST_RUN_FLAG && test_run 1 "unknown option: $arg"
          printf 'Unknown command line option: %s\n' $arg >&2
          printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
          exit 1
       fi
+      # Have to work with if statements and regex to support short parameter without space delimiter.
+      if [[ $arg =~ ^(-h|--help)$ ]]; then
+         $TEST_RUN_FLAG && test_run 0 || usage
+      fi
+      [[ $arg =~ -?(a|-auto$) ]] && AUTO_FLAG=true
+      [[ $arg =~ -?(l|-list$) ]] && LIST_FLAG=true
+      [[ $arg =~ -?(r|-rev$) ]] && REVERSE_FLAG=true
+
       # Not documented debug param just to show some important regex.
       if [[ $arg == --regex ]]; then
+         $TEST_RUN_FLAG && test_run 0
          printf "INDEX_REGEX='%s'\n" "$INDEX_REGEX"
          printf "SHORT_PARAM_REGEX='%s'\n" "$SHORT_PARAM_REGEX"
          printf "LONG_PARAM_REGEX='%s'\n" "$LONG_PARAM_REGEX"
          exit 0
       fi
-      # Have to work with if statements and regex to support short parameter without space delimiter.
-      [[ $arg =~ ^(-h|--help)$ ]] && usage
-      [[ $arg =~ -?(a|-auto$) ]] && AUTO_FLAG=true
-      [[ $arg =~ -?(l|-list$) ]] && LIST_FLAG=true
-      [[ $arg =~ -?(r|-rev$) ]] && REVERSE_FLAG=true
 
       if [[ $arg =~ $INDEX_REGEX ]]; then
          if [[ -z $INDEX ]]; then
             INDEX=$arg
          else
+            $TEST_RUN_FLAG && test_run 1 "multiple index"
             echo 'Passing "index" multiple times is not supported.' >&2
             printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
             exit 1
@@ -132,10 +143,13 @@ parse_argv() {
    $AUTO_FLAG && $LIST_FLAG && AUTO_FLAG=false
 
    if $LIST_FLAG && [[ -n $INDEX ]]; then
+      $TEST_RUN_FLAG && test_run 1 "param mutually exclusive"
       echo "Specified parameters are mutually exclusive." >&2
       printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
       exit 1
    fi
+
+   $TEST_RUN_FLAG && test_run 0 || true
 }
 
 create_hist_file() {
@@ -257,17 +271,9 @@ read_input() {
 
 validate_input() {
    if [[ ! $INPUT =~ $INDEX_REGEX ]]; then
-      if $TEST_FLAG; then
-         printf 'invalid: %s, ' "$INPUT"
-      else
-         printf 'Invalid input: %s\n' "$INPUT" >&2
-         printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
-         exit 1
-      fi
-   else
-      if $TEST_FLAG; then
-         printf 'valid: %s, ' "$INPUT"
-      fi
+      printf 'Invalid input: %s\n' "$INPUT" >&2
+      printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
+      exit 1
    fi
    if [[ $INPUT =~ p ]]; then
       INPUT=${INPUT/p/}
@@ -282,10 +288,6 @@ cleanup_input() {
             | sed 's/[+-]0*$//' \
             | sed 's/+0*/+/' \
             | sed 's/-0*/-/' )
-   if $TEST_FLAG; then
-     printf 'INPUT: %s, PING_FLAG: %s\n' "$INPUT" "$PING_FLAG"
-     exit
-   fi
 }
 
 get_ip_fqdn() {
