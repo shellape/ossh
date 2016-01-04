@@ -309,7 +309,7 @@ get_ip_fqdn() {
             exit 1
          fi
       else
-         printf '\nCould not match an FQDN in "%s".\n' "$line" >&2   
+         printf '\nCould not match an FQDN in "%s".\n' "$line" >&2 
          exit 1
       fi
    fi
