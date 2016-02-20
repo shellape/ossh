@@ -358,7 +358,7 @@ build_action_cmd() {
       if [[ -n $fqdn ]]; then 
          SSH_LOGIN="$( echo "$ssh_client_cmd" | sed "s/$fqdn/$new_ip_addr/" )"
       else
-         # To stay MacOS compatible avoid the use of sed's "-r" parameter.
+         # To stay OS X compatible avoid the use of sed's "-r" parameter.
          SSH_LOGIN="$( echo "$ssh_client_cmd" \
                         | sed "s/[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*/$new_ip_addr/" )"
       fi
