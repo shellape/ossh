@@ -162,8 +162,12 @@ create_hist_file() {
 }
 
 get_curr_conn() {
-   # Notice the trailing space in grep pattern.
-   local ps_list="$( ps -eo args | grep '^ssh ' )"
+   local ps_list
+   # ssh processes in state T occur often on OS X when using
+   # standby regularly, thus trying to exclude this connections.
+   ps_list="$( ps -eo state,args \
+               | awk '$2 == "ssh" && $1 !~ /T/ { $1=""; print }' \
+               | sort -u )"
    if [[ -n $ps_list ]]; then
       while read ssh_client_cmd; do
          if [[ $ssh_client_cmd =~ ${CONN_EXCL_RE:-^$} ]]; then
@@ -173,9 +177,8 @@ get_curr_conn() {
             i=$(( $i + 1 ))
          fi
       # Notice the use of process substition!
-      done < <( echo "$ps_list" | sort -u )
+      done < <( echo "$ps_list" )
    fi
-
 }
 
 check_conn_exists() {
