@@ -1,20 +1,17 @@
 
-ossh - ssh connection manager
-=============
+# ossh - a ssh connection manager
 
 ossh shows open ssh connections and the user can establish a connection based on the shown information.
 
-Features
--------
+## Features
 
 * show open ssh connections
 * show recently used ssh connections (via ossh history file)
 * open new ssh connection
 * increase/decrease ip v4 address you see in ossh overview
-  used as new ssh host to connect to
+  to be used as new ssh host to connect to
 
-Builtin help
--------
+## Builtin help
 ```
 $> ossh -h
 Usage: ossh [-l|--list] [-a|--auto] [-r|--rev] [-h|--help] [index]
@@ -28,15 +25,13 @@ Options:
             (superseded by "index")
  -r|--rev   output will show first history then current connections
  -h|--help  show this help
- index      specify a numeric index to use from the overview, e.g. "2" or "4"
+ index      specify a numeric index to be used from the overview, e.g. "2" or "4"
             using +/- modifies ip's last octett of the choosen index, e.g. "+3" or "4-2"
             (appending "p" to "index" will just ping the ip, e.g. "2p" or "4+6p")
 
-
 ```
 
-Walkthrough
--------
+## Walkthrough
 
 * open a new ssh connection to [01]
 ```
@@ -58,8 +53,7 @@ Walkthrough
 >id: 2+2
 ```
 
-Hints
--------
+## Hints
 
 * For choosing the first entry from the overview you can simply hit enter.
 * "[-b]" in the overview implies that all entries below come from the history file.
@@ -69,10 +63,14 @@ Hints
 * Passing the parameter "[-r|--rev]" will output first history then current connections.
   The history indicator changes then from "[-b]" to "[-a]" to show history is above.
   This is useful if you have quite a lot of history connections and your terminal window is small.
-* If you know what the overview looks like you can pass the id direclty, e.g. "ossh 1" or "ossh 4+2"
+* If you know what the overview looks like you can pass the id directly, e.g. "ossh 1" or "ossh 4+2"
 * Passing a trailing "p" to the "index" will just ping the ip, e.g. "2p" or "8p-2" or "6+2p".
-* If there's a FQDN in the ossh overview a name lookup will be performed when increasing/decreasing.
-* There are global variables in the script header. Read the script's comments for further information. Default values:
+* If there is a FQDN in the ossh overview a name lookup will be performed when increasing/decreasing.
+* There are global variables in the script header.
+
+  **It is generally recommended to put your modified variables in ~/.ossh_include.conf to avoid conflicts on ossh updates.**
+
+  Read the script's comments for further information. Default values:
 ```
 HIST_FILE=~/.ossh_history
 MAX_HIST_LINES=16
@@ -84,18 +82,15 @@ HOST_PARAM='-4 -t A'
 INCLUDE_CONF=~/.ossh_include.conf
 ```
 
-Known Problems
--------
+## Known Problems
 
 * increasing/decreasing an ip v6 address is not supported
 
-Author
--------
+## Author
 
 * Vladimir <vd@ghostshell.de>
 
-License
--------
+## License
 
 ossh is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

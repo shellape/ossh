@@ -5,7 +5,6 @@
 # author:        vd@ghostshell.de
 # version:       0.1
 # tested on:     Debian Wheezy, Debian Jessie
-# last modified: 2015-12
 # vim: ts=3 sw=3 sts=3 et ai ci
 
 set -e
@@ -31,6 +30,7 @@ PING_PARAM='-c3'
 HOST_PARAM='-4 -t A'
 
 # Above variables can also be sourced via include config.
+# NOTICE: Changing INCLUDE_CONF can conflict with future ossh updates.
 INCLUDE_CONF=~/.ossh_include.conf
 [[ -f $INCLUDE_CONF ]] && . $INCLUDE_CONF
 
