@@ -11,6 +11,9 @@ set -e
 # thx to http://wiki.bash-hackers.org/scripting/debuggingtips
 export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
+# NOTICE: It is generally recommended to use the include config file ~/.ossh_include.conf
+#         for your custom user variable values. This will avoid conflicts on ossh updates.
+
 #-----------------------
 # Gloabl user variables
 #-----------------------
