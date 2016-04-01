@@ -69,17 +69,29 @@ Options:
 * There are global variables in the script header.
 
   **It is generally recommended to put your modified variables in ~/.ossh_include.conf to avoid conflicts on ossh updates.**
+  **Simply execute this command to generate the include config:**
 
-  Read the script's comments for further information. Default values:
+```
+ossh/bin/gen-include.sh -w > ~/.ossh_include.conf
+```
+
+  The default values and short explanations:
+
 ```
 HIST_FILE=~/.ossh_history
 MAX_HIST_LINES=16
+# Optional bash compatible regex for ssh connections which
+# should not appear in the connection overview at all.
 CONN_EXCL_RE='sshfs|sftp|scp| -fnN '
+# Optional sed compatible expression to strip off a part of the ssh command
+# in the connection overview. e.g. SSH_STRIP_EXPR='s/ .*foobar//'
 SSH_STRIP_EXPR=''
+# I you're using a wrapper to call ssh you can specify it here.
 SSH_BIN=''
+# command parameters
 PING_PARAM='-c3'
 HOST_PARAM='-4 -t A'
-INCLUDE_CONF=~/.ossh_include.conf
+
 ```
 
 ## Known Problems
