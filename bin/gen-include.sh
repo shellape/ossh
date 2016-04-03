@@ -13,7 +13,7 @@ SCRIPT_CWD=$( cd ${0%/*} 2> /dev/null; pwd )
 OSSH_BIN=ossh
 
 if [[ $1 =~ -h|--help|help ]] || [[ $1 != -w ]]; then
-   printf "Write include config file to stdout (using defaults of $OSSH_BIN)\n\n"
+   printf "Write include config file to stdout (using defaults of $OSSH_BIN).\n\n"
    printf "Usage: $PROG_NAME -w\n\n"
    printf "Optionally write it to the include config (e.g. ~/.ossh_include.conf)\n\n"
    exit 1

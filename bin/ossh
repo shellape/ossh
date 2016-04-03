@@ -67,7 +67,7 @@ usage() {
 cat <<EOF
 Usage: $PROG_NAME [-l|--list] [-a|--auto] [-r|--rev] [-h|--help] [index]
 
-List or establish ssh connections
+List or establish ssh connections.
 
 Options:
  -l|--list  only list connections, do not a ask for a connection id
