@@ -17,7 +17,7 @@ export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 #-----------------------
 # Gloabl user variables
 #-----------------------
-
+#<USER_CONFIG>
 HIST_FILE=~/.ossh_history
 MAX_HIST_LINES=16
 # Optional bash compatible regex for ssh connections which
@@ -31,6 +31,7 @@ SSH_BIN=''
 # command parameters
 PING_PARAM='-c3'
 HOST_PARAM='-4 -t A'
+#</USER_CONFIG>
 
 # Above variables can also be sourced via include config.
 # NOTICE: Changing INCLUDE_CONF can conflict with future ossh updates.
@@ -40,7 +41,6 @@ INCLUDE_CONF=~/.ossh_include.conf
 #------------------------
 # Other global variables
 #------------------------
-
 PROG_NAME=${0##*/}
 ARGV=$@
 ARGC=$#
