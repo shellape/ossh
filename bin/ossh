@@ -234,7 +234,7 @@ print_curr_conn() {
    $REVERSE_FLAG && SORT='sort -rn'
    for x in ${!CONN_ARR[@]}; do
       if [[ -z $INDEX ]]; then
-         strip_off $( printf "[%02d] %s\n" $(( $x + 1 )) "${CONN_ARR[ $x ]}" )
+         strip_off "$( printf "[%02d] %s\n" $(( $x + 1 )) "${CONN_ARR[ $x ]}" )"
       fi
    done | ${SORT:-cat}
 }
