@@ -4,14 +4,13 @@
 #                establish a further one if requested.
 # author:        vd@ghostshell.de
 # version:       0.1
-# tested on:     Debian Wheezy, Debian Jessie
+# tested on:     Debian Wheezy, Debian Jessie, macOS
 # vim: ts=3 sw=3 sts=3 et ai ci
 
 set -e
-# thx to http://wiki.bash-hackers.org/scripting/debuggingtips
 export PS4='+(${BASH_SOURCE}:${LINENO}): ${FUNCNAME[0]:+${FUNCNAME[0]}(): }'
 
-# NOTICE: It is generally recommended to use the include config file ~/.ossh_include.conf
+# NOTICE: It is generally recommended to use the include config file ~/.ossh.conf
 #         for your custom user variable values. This will avoid conflicts on ossh updates.
 
 #-----------------------
@@ -22,6 +21,7 @@ HIST_FILE=~/.ossh_history
 MAX_HIST_LINES=16
 # Optional bash compatible regex for ssh connections which
 # should not appear in the connection overview at all.
+# Exclude is applied on active connections only, not on history.
 CONN_EXCL_RE='sshfs|sftp|scp| -fnN '
 # Optional sed compatible expression to strip off a part of the ssh command
 # in the connection overview. e.g. SSH_STRIP_EXPR='s/ .*foobar//'
@@ -34,9 +34,7 @@ HOST_PARAM='-4 -t A'
 #</USER_CONFIG>
 
 # Above variables can also be sourced via include config.
-# NOTICE: Changing INCLUDE_CONF can conflict with future ossh updates.
-INCLUDE_CONF=~/.ossh_include.conf
-[[ -f $INCLUDE_CONF ]] && . $INCLUDE_CONF
+INCLUDE_CONF=~/.ossh.conf
 
 #------------------------
 # Other global variables
@@ -47,8 +45,8 @@ ARGC=$#
 # bash compatible regex
 INDEX_REGEX='^p?$|^[0-9]{0,2}[+-]?[0-9]{1,3}p?$|^[0-9]{1,2}p?[+-]?[0-9]{1,3}$'
 # bash compatible regex (needs improvement)
-SHORT_PARAM_REGEX='^-(a?l?r?|a?r?l?|l?a?r?|l?r?a?|r?a?l?|r?l?a?)[lar]$|^-(t|h)$'
-LONG_PARAM_REGEX='^--(list|auto|rev|help|regex)$'
+SHORT_PARAM_REGEX='^-(a?l?r?|a?r?l?|l?a?r?|l?r?a?|r?a?l?|r?l?a?)[lar]$|^-(t|h)$|^-c$'
+LONG_PARAM_REGEX='^--(list|auto|rev|conf|help|regex)$'
 # grep and bash compatible extended regex
 IP_V4_REGEX='([0-9]+\.){3}[0-9]+'
 # grep compatible extended regex
@@ -58,6 +56,7 @@ LIST_FLAG=false
 PING_FLAG=false
 TEST_RUN_FLAG=false
 REVERSE_FLAG=false
+CONFIG_FLAG=false
 
 #-----------
 # Functions
@@ -65,23 +64,30 @@ REVERSE_FLAG=false
 
 usage() {
 cat <<EOF
-Usage: $PROG_NAME [-l|--list] [-a|--auto] [-r|--rev] [-h|--help] [index]
+Usage: $PROG_NAME [-l|--list] [-a|--auto] [-r|--rev] [-c|--conf <file>] [-h|--help] [index]
 
 List or establish ssh connections.
 
 Options:
- -l|--list  only list connections, do not a ask for a connection id
-            (mutually exclusive with "index", supersedes "-a")
- -a|--auto  auto login (or ping) if there is only one unique current connection
-            (superseded by "index")
- -r|--rev   show output in reverse order, first history then current connections
- -h|--help  show this help
- index      specify a numeric index to use from the overview, e.g. "2" or "4"
-            using +/- modifies ip's last octett of the choosen index, e.g. "+3" or "4-2"
-            (appending "p" to "index" will just ping the ip, e.g. "2p" or "4+6p")
+ -l|--list         only list connections, do not a ask for a connection id
+                   (mutually exclusive with "index", supersedes "-a")
+ -a|--auto         auto login (or ping) if there is only one unique current connection
+                   (superseded by "index")
+ -r|--rev          show output in reverse order, first history then current connections
+ -c|--conf <file>  specify path to custom config file
+                   (by default $PROG_NAME looks for .ossh.conf in your home directory)
+ -h|--help         show this help
+ index             specify a numeric index to use from the overview, e.g. "2" or "4"
+                   using +/- modifies ip's last octett of the choosen index, e.g. "+3" or "4-2"
+                   (appending "p" to "index" will just ping the ip, e.g. "2p" or "4+6p")
 
 EOF
 exit 0
+}
+
+
+show_help_note() {
+   printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
 }
 
 test_run() {
@@ -90,30 +96,53 @@ test_run() {
    err_msg="$2"
    [[ rc -eq 0 ]] && is_valid=VALID || is_valid=INVALID
    printf '%s; ARGV: "%s"; ERR_MSG: "%s"\n' "$is_valid" "$ARGV" "$err_msg"
-   exit $rc
+   if $CONFIG_FLAG; then
+      CONFIG_FLAG=false
+      return $rc
+   else
+      exit $rc
+   fi
 }
 
 parse_argv() {
+   local args_left=$( echo $ARGV | wc -w | sed 's/ *//g' )
    for arg in $ARGV; do
-      # Not documented "-t" test-run parameter. It jush shows if parameter and/or "index"
+      args_left=$(( args_left - 1 ))
+      # Internal parameter "-t" calling test_run function. It jush shows if parameter and/or "index"
       # would be valid without performing any action (e.g. useful before commiting changes).
       # To work properly "-t" must be specified as first parameter.
       if [[ $arg = -t ]]; then
-         if [[ $ARGC -ge 2 ]] && [[ $ARGC -le 4 ]]; then
+         if [[ $ARGC -ge 2 ]] && [[ $ARGC -le 6 ]]; then
             TEST_RUN_FLAG=true
          else
-            test_run 1 'min 1, max 3 arguments'
+            test_run 1 'min 1, max 5 arguments'
          fi
       fi
 
+      if [[ $arg =~ ^(-c|--conf$) ]]; then
+         CONFIG_FLAG=true
+         if [[ $args_left -gt 0 ]]; then
+            continue
+         else
+            $TEST_RUN_FLAG && test_run 1 '-c requires an argument'
+            echo "-c requires an argument" >&2
+            exit 1
+         fi
+      fi
+      if $CONFIG_FLAG; then
+         USER_CONF="$arg"
+         CONFIG_FLAG=false
+         continue
+      fi
+
       # Check if allowed parameter or "index" was passed.
+      # Have to work with if statements and regex to support short parameter without space delimiter.
       if [[ ! $arg =~ $INDEX_REGEX|$SHORT_PARAM_REGEX|$LONG_PARAM_REGEX ]]; then
          $TEST_RUN_FLAG && test_run 1 "unknown option: $arg"
          printf 'Unknown command line option: %s\n' $arg >&2
-         printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
+         show_help_note
          exit 1
       fi
-      # Have to work with if statements and regex to support short parameter without space delimiter.
       if [[ $arg =~ ^(-h|--help)$ ]]; then
          $TEST_RUN_FLAG && test_run 0 || usage
       fi
@@ -121,7 +150,7 @@ parse_argv() {
       [[ $arg =~ -?(l|-list$) ]] && LIST_FLAG=true
       [[ $arg =~ -?(r|-rev$) ]] && REVERSE_FLAG=true
 
-      # Not documented debug param just to show some important regex.
+      # Internal debug param just to show some important regex.
       if [[ $arg == --regex ]]; then
          $TEST_RUN_FLAG && test_run 0
          printf "INDEX_REGEX='%s'\n" "$INDEX_REGEX"
@@ -136,7 +165,7 @@ parse_argv() {
          else
             $TEST_RUN_FLAG && test_run 1 "multiple index"
             echo 'Passing "index" multiple times is not supported.' >&2
-            printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
+            show_help_note
             exit 1
          fi
          [[ $arg =~ p ]] && PING_FLAG=true
@@ -148,11 +177,29 @@ parse_argv() {
    if $LIST_FLAG && [[ -n $INDEX ]]; then
       $TEST_RUN_FLAG && test_run 1 "param mutually exclusive"
       echo "Specified parameters are mutually exclusive." >&2
-      printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
+      show_help_note
       exit 1
    fi
 
    $TEST_RUN_FLAG && test_run 0 || true
+}
+
+load_conf() {
+   for c in $INCLUDE_CONF ~/.ossh_include.conf $USER_CONF; do
+      [[ ! -e $c ]] && [[ $c =~ .ossh_include.conf|.ossh.conf ]] && continue
+      if [[ -r $c ]] && [[ -f $c ]]; then
+         while read line; do
+            echo "$line" | grep -Eq '^#|^$' && continue
+            # Need to manually expand tilde if specified in conf file.
+            line=${line/\~/$HOME}
+            export "$line"
+         done < $c
+      else
+         $TEST_RUN_FLAG && test_run 1 "conf file not readable or no regular file"
+         echo "$c is not readable or no regular file." >&2
+         exit 1
+      fi
+   done
 }
 
 create_hist_file() {
@@ -279,7 +326,7 @@ read_input() {
 validate_input() {
    if [[ ! $INPUT =~ $INDEX_REGEX ]]; then
       printf 'Invalid input: %s\n' "$INPUT" >&2
-      printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
+      show_help_note
       exit 1
    fi
    if [[ $INPUT =~ p ]]; then
@@ -420,6 +467,7 @@ exec_action_cmd() {
 #------
 
 parse_argv
+load_conf
 create_hist_file
 get_curr_conn
 check_conn_exists

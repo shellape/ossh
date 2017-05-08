@@ -1,4 +1,4 @@
 It is generally recommended to put your modified variables
-in ~/.ossh_include.conf to avoid conflicts on ossh updates.
+in ~/.ossh.conf to avoid conflicts on ossh updates.
 
-Check out the sample config files in this directory.
+Check out the sample config files in the sample directories.

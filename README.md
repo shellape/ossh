@@ -14,20 +14,22 @@ ossh shows open ssh connections and the user can establish a connection based on
 ## Builtin help
 ```
 $> ossh -h
-Usage: ossh [-l|--list] [-a|--auto] [-r|--rev] [-h|--help] [index]
+Usage: ossh [-l|--list] [-a|--auto] [-r|--rev] [-c|--conf <file>] [-h|--help] [index]
 
 List or establish ssh connections.
 
 Options:
- -l|--list  only list connections, do not a ask for a connection id
-            (mutually exclusive with "index", supersedes "-a")
- -a|--auto  auto login (or ping) if there is only one unique current connection
-            (superseded by "index")
- -r|--rev   output will show first history then current connections
- -h|--help  show this help
- index      specify a numeric index to be used from the overview, e.g. "2" or "4"
-            using +/- modifies ip's last octett of the choosen index, e.g. "+3" or "4-2"
-            (appending "p" to "index" will just ping the ip, e.g. "2p" or "4+6p")
+ -l|--list         only list connections, do not a ask for a connection id
+                   (mutually exclusive with "index", supersedes "-a")
+ -a|--auto         auto login (or ping) if there is only one unique current connection
+                   (superseded by "index")
+ -r|--rev          show output in reverse order, first history then current connections
+ -c|--conf <file>  specify path to custom config file
+                   (by default ossh looks for ~/.ossh.conf)
+ -h|--help         show this help
+ index             specify a numeric index to use from the overview, e.g. "2" or "4"
+                   using +/- modifies ip's last octett of the choosen index, e.g. "+3" or "4-2"
+                   (appending "p" to "index" will just ping the ip, e.g. "2p" or "4+6p")
 
 ```
 
@@ -68,11 +70,11 @@ Options:
 * If there is a FQDN in the ossh overview a name lookup will be performed when increasing/decreasing.
 * There are global variables in the script header.
 
-  **It is generally recommended to put your modified variables in ~/.ossh_include.conf to avoid conflicts on ossh updates.**
+  **It is generally recommended to put your modified variables in ~/.ossh.conf to avoid conflicts on ossh updates.**
   **Simply execute this command to generate the include config:**
 
 ```
-ossh/bin/gen-include.sh -w > ~/.ossh_include.conf
+ossh/bin/gen-include.sh -w > ~/.ossh.conf
 ```
 
   The default values and short explanations:

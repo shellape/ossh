@@ -3,7 +3,7 @@
 # description:   Generate the ossh include config from ossh's default values.
 # author:        vd@ghostshell.de
 # version:       0.1
-# tested on:     Debian Jessie
+# tested on:     Debian Jessie macOS
 # vim: ts=3 sw=3 sts=3 et ai ci
 set -e
 
@@ -11,7 +11,7 @@ PROG_NAME="${0##*/}"
 ARGV="$@"
 SCRIPT_CWD=$( cd ${0%/*} 2> /dev/null; pwd )
 OSSH_BIN=ossh
-OSSH_INCLUDE_CONF='~/.ossh_include.conf'
+OSSH_INCLUDE_CONF='~/.ossh.conf'
 CONFIG_START='#<USER_CONFIG>'
 CONFIG_END='#</USER_CONFIG>'
 USAGE="\
