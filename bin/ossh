@@ -189,7 +189,7 @@ load_conf() {
       [[ ! -e $c ]] && [[ $c =~ .ossh_include.conf|.ossh.conf ]] && continue
       if [[ -r $c ]] && [[ -f $c ]]; then
          while read line; do
-            echo "$line" | grep -Eq '^#|^$' && continue
+            echo "$line" | grep -Eq "^#|^$|=['\"]{2}" && continue
             # Need to manually expand tilde if specified in conf file.
             line=${line/\~/$HOME}
             export "$line"
