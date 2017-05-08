@@ -192,7 +192,9 @@ load_conf() {
             echo "$line" | grep -Eq "^#|^$|=['\"]{2}" && continue
             # Need to manually expand tilde if specified in conf file.
             line=${line/\~/$HOME}
-            export "$line"
+            var=$( echo "$line" | cut -d= -f1 )
+            val=$( echo "$line" | cut -d= -f2 | sed "s/[\"']//g" )
+            export $var="$val"
          done < $c
       else
          $TEST_RUN_FLAG && test_run 1 "conf file not readable or no regular file"
