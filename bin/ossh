@@ -87,7 +87,6 @@ EOF
 exit 0
 }
 
-
 show_help_note() {
    printf '\nTry "%s -h" for help.\n' $PROG_NAME >&2
 }
