@@ -84,6 +84,7 @@ HIST_FILE=~/.ossh_history
 MAX_HIST_LINES=16
 # Optional bash compatible regex for ssh connections which
 # should not appear in the connection overview at all.
+# Exclude is applied on active connections only, not on history.
 CONN_EXCL_RE='sshfs|sftp|scp| -fnN '
 # Optional sed compatible expression to strip off a part of the ssh command
 # in the connection overview. e.g. SSH_STRIP_EXPR='s/ .*foobar//'
@@ -93,7 +94,8 @@ SSH_BIN=''
 # command parameters
 PING_PARAM='-c3'
 HOST_PARAM='-4 -t A'
-
+# Skip the output of current connections, thus show only history.
+SKIP_CURR_CONN=no
 ```
 
 ## Known Problems

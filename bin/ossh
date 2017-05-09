@@ -31,6 +31,8 @@ SSH_BIN=''
 # command parameters
 PING_PARAM='-c3'
 HOST_PARAM='-4 -t A'
+# Skip the output of current connections, thus show only history.
+SKIP_CURR_CONN=no
 #</USER_CONFIG>
 
 # Above variables can also be sourced via include config.
@@ -189,11 +191,13 @@ load_conf() {
       [[ ! -e $c ]] && [[ $c =~ .ossh_include.conf|.ossh.conf ]] && continue
       if [[ -r $c ]] && [[ -f $c ]]; then
          while read line; do
-            echo "$line" | grep -Eq "^#|^$|=['\"]{2}" && continue
+            echo "$line" | grep -Eq "^#|^$" && continue
             # Need to manually expand tilde if specified in conf file.
             line=${line/\~/$HOME}
             var=$( echo "$line" | cut -d= -f1 )
             val=$( echo "$line" | cut -d= -f2 | sed "s/[\"']//g" )
+            echo "$line" | grep -Eq "=['\"]{2}" && unset $var
+            #printf '%s="%s"\n' $var "$val"
             export $var="$val"
          done < $c
       else
@@ -205,6 +209,7 @@ load_conf() {
 }
 
 create_hist_file() {
+   [[ -z $HIST_FILE ]] && return
    local hist_basedir
    if [[ ! -e $HIST_FILE ]]; then
       hist_basedir=${HIST_FILE%/*}
@@ -214,6 +219,7 @@ create_hist_file() {
 }
 
 get_curr_conn() {
+   [[ $SKIP_CURR_CONN = yes ]] && return
    local ps_list
    # ssh processes in state T occur often on OS X when using
    # standby regularly, thus trying to exclude this connections.
@@ -252,7 +258,7 @@ strip_off() {
 
 read_hist_file() {
    local conn_line hist_line duplicate
-   if [[ -s $HIST_FILE ]]; then
+   if [[ -n $HIST_FILE ]] && [[ -s $HIST_FILE ]]; then
       # Fill the history array.
       while read hist_line; do
          duplicate=false
@@ -280,6 +286,7 @@ check_auto_flag() {
 
 print_curr_conn() {
    check_auto_flag
+   [[ $SKIP_CURR_CONN = yes ]] && return
    $REVERSE_FLAG && SORT='sort -rn'
    for x in ${!CONN_ARR[@]}; do
       if [[ -z $INDEX ]]; then
@@ -296,12 +303,22 @@ print_hist_conn() {
    if $REVERSE_FLAG; then
       SORT='sort -rn'
    else
-      echo '[-b]'
+      if [[ $SKIP_CURR_CONN = yes ]]; then
+         echo '[-h]'
+      else
+         echo '[-b]'
+      fi
    fi
    for i in "${!HIST_ARR[@]}"; do
       printf "[%02d] %s\n" $(( ${#CONN_ARR[@]} + $i + 1 )) "${HIST_ARR[ $i ]}"
    done | ${SORT:-cat}
-   $REVERSE_FLAG && echo '[-a]' || true
+   if $REVERSE_FLAG; then
+      if [[ $SKIP_CURR_CONN = yes ]]; then
+         echo '[-h]'
+      else
+         echo '[-a]'
+      fi
+   fi
 }
 
 print_all_conn() {
@@ -436,6 +453,7 @@ build_action_cmd() {
 
 write_hist() {
    $PING_FLAG && return
+   [[ -z $HIST_FILE ]] && return
    local stripped_ssh_login="$( strip_off "$SSH_LOGIN" )"
 
    if [[ -n $HIST_FILE ]] && [[ $MAX_HIST_LINES -gt 0 ]]; then
