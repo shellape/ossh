@@ -22,7 +22,7 @@ MAX_HIST_LINES=16
 # Optional bash compatible regex for ssh connections which
 # should not appear in the connection overview at all.
 # Exclude is applied on active connections only, not on history.
-CONN_EXCL_RE='sshfs|sftp|scp| -fnN '
+CONN_EXCL_RE='sshfs|sftp|scp| -fnN |-W [^%]'
 # Optional sed compatible expression to strip off a part of the ssh command
 # in the connection overview. e.g. SSH_STRIP_EXPR='s/ .*foobar//'
 SSH_STRIP_EXPR=''
