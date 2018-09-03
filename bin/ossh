@@ -229,10 +229,12 @@ get_curr_conn() {
       while read ssh_client_cmd; do
          if [[ $ssh_client_cmd =~ ${CONN_EXCL_RE:-^$} ]]; then
             continue
-         else
-            CONN_ARR[ ${i:=0} ]="$ssh_client_cmd"
-            i=$(( $i + 1 ))
          fi
+         if [[ $ssh_client_cmd =~ ProxyCommand.*%h:%p ]]; then
+            ssh_client_cmd="$( echo "$ssh_client_cmd" | sed -E "s/ProxyCommand=/&'/; s/.*%h:%p [^ ]+/&'/" )"
+         fi
+         CONN_ARR[ ${i:=0} ]="$ssh_client_cmd"
+         i=$(( $i + 1 ))
       # Notice the use of process substition!
       done < <( echo "$ps_list" )
    fi
