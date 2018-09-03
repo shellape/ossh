@@ -269,6 +269,9 @@ read_hist_file() {
                break
             fi
          done
+         if [[ $hist_line =~ ${CONN_EXCL_RE:-^$} ]]; then
+            continue
+         fi
          if ! $duplicate; then
             HIST_ARR[ ${j:=0} ]="$hist_line"
             j=$(( $j + 1 ))
