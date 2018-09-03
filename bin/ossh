@@ -1,4 +1,4 @@
-#!/bin/bash 
+#!/bin/bash
 # name:          ossh
 # description:   List current ssh client connections and
 #                establish a further one if requested.
@@ -377,11 +377,11 @@ get_ip_fqdn() {
          if [[ $ip_addr =~ $IP_V4_REGEX ]]; then
             echo "$ip_addr $fqdn"
          else
-            printf '\nCould not match an IPv4 in "%s".\n' "$ip_addr" >&2 
+            printf '\nCould not match an IPv4 in "%s".\n' "$ip_addr" >&2
             exit 1
          fi
       else
-         printf '\nCould not match an FQDN in "%s".\n' "$line" >&2 
+         printf '\nCould not match an FQDN in "%s".\n' "$line" >&2
          exit 1
       fi
    fi
@@ -426,7 +426,7 @@ build_action_cmd() {
          echo '\n%s not within meaningful IPv4 range.' "$new_last_oct" >&2
          exit 1
       fi
-      if [[ -n $fqdn ]]; then 
+      if [[ -n $fqdn ]]; then
          SSH_LOGIN="$( echo "$ssh_client_cmd" | sed "s/$fqdn/$new_ip_addr/" )"
       else
          # To stay OS X compatible avoid the use of sed's "-r" parameter.
