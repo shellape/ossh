@@ -231,7 +231,7 @@ get_curr_conn() {
             continue
          fi
          if [[ $ssh_client_cmd =~ ProxyCommand.*%h:%p ]]; then
-            ssh_client_cmd="$( echo "$ssh_client_cmd" | sed -E "s/ProxyCommand=/&'/; s/.*%h:%p [^ ]+/&'/" )"
+            ssh_client_cmd="$( echo "$ssh_client_cmd" | sed -E 's/ProxyCommand=/&"/; s/.*%h:%p [^ ]+/&"/' )"
          fi
          CONN_ARR[ ${i:=0} ]="$ssh_client_cmd"
          i=$(( $i + 1 ))
@@ -477,10 +477,12 @@ exec_action_cmd() {
       $PING_CMD
       exit $?
    fi
-   if [[ -z $SSH_BIN ]]; then
-      $SSH_LOGIN
-   else
+   if [[ -n $SSH_BIN ]]; then
       SSH_LOGIN="$( echo "$SSH_LOGIN" | sed "s;ssh;$SSH_BIN;" )"
+   fi
+   if [[ $SSH_LOGIN =~ ProxyCommand ]]; then
+      bash -c "$SSH_LOGIN"
+   else
       $SSH_LOGIN
    fi
 }
