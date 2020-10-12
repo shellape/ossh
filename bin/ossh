@@ -2,7 +2,6 @@
 # name:          ossh
 # description:   List current ssh client connections and
 #                establish a further one if requested.
-# author:        vd@ghostshell.de
 # version:       0.1
 # tested on:     Debian Wheezy, Debian Jessie, macOS
 # vim: ts=3 sw=3 sts=3 et ai ci

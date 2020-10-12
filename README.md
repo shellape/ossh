@@ -104,7 +104,7 @@ SKIP_CURR_CONN=no
 
 ## Author
 
-* Vladimir <vd@ghostshell.de>
+* Vladimir
 
 ## License
 
